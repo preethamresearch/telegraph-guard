@@ -40,6 +40,11 @@ _BOOL_RISK_KEYS = (
 _CONFIDENCE_KEYS = ("confidence", "confidence_score", "certainty", "score_confidence")
 
 # Categorical risk tiers / verdict strings → risk value.
+#
+# "ok" is deliberately absent. Observed live from TxLens /wallet-balance:
+# `status: "ok"` means the *request* succeeded, not that the *subject* is
+# safe — yet the extractor read it as risk 0.05 and the UI displayed a
+# safety score for a plain balance lookup. An ambiguous word is no verdict.
 _TIERS: dict[str, float] = {
     "critical": 0.95, "severe": 0.95, "malicious": 0.95, "phishing": 0.95,
     "scam": 0.95, "fraud": 0.9, "fraudulent": 0.9, "dangerous": 0.9,
@@ -47,12 +52,21 @@ _TIERS: dict[str, float] = {
     "moderate": 0.5, "unknown": None, "unrated": None, "none": 0.05,
     "low": 0.15, "low_risk": 0.15, "minimal": 0.1, "safe": 0.05,
     "clean": 0.05, "benign": 0.05, "legitimate": 0.05, "trusted": 0.02,
-    "ok": 0.05, "harmless": 0.05, "no_risk": 0.02,
+    "harmless": 0.05, "no_risk": 0.02,
 }
 _TIER_KEYS = (
     "risk_tier", "risk_level", "tier", "level", "verdict", "classification",
     "category", "status", "rating", "label", "assessment", "result",
 )
+
+#: Words that describe the outcome of the *request*, not a judgement of the
+#: subject. On `status`/`result` keys these are skipped before tier lookup,
+#: so `status: "none"` or `result: "complete"` can never read as a verdict.
+_OPERATIONAL_STATUSES = {
+    "ok", "success", "succeeded", "successful", "complete", "completed",
+    "done", "ready", "active", "pending", "error", "failed", "failure",
+    "none", "partial",
+}
 
 
 def _walk(obj: Any, depth: int = 0):
@@ -322,6 +336,12 @@ def extract_risk(result: Any) -> float | None:
 
     for key, val in pairs:
         if key in _TIER_KEYS:
+            if (
+                key in ("status", "result")
+                and isinstance(val, str)
+                and val.strip().lower() in _OPERATIONAL_STATUSES
+            ):
+                continue
             t = _tier_value(val)
             if t is not None:
                 return t

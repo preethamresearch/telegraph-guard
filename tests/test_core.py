@@ -443,3 +443,23 @@ def test_miners_per_intent_defaults_to_one():
     assert GuardConfig().miners_per_intent == 1
     with pytest.raises(ValueError):
         GuardConfig(miners_per_intent=0)
+
+
+async def test_direct_payload_query_matches_the_intent():
+    """Receipts are public: a balance call must not carry the fraud question.
+    Observed in live signal 0xca378ca8… and spotted by a user auditing it."""
+    fake = FakeEngine({
+        INTENT_FRAUD: engine_reply(INTENT_FRAUD, "9002", "TxLens",
+                                   {"risk_score": 0.1, "confidence": 0.8}),
+        INTENT_WALLET: engine_reply(INTENT_WALLET, "9002", "TxLens",
+                                    {"balance_native": 1.0, "status": "ok"}),
+    })
+    cfg = GuardConfig(miners=["9002"], min_signals=1)
+    await guard_with(fake, cfg).screen(ADDR)
+
+    for path, body in fake.requests:
+        q = (body.get("payload") or {}).get("query", "")
+        if "balance" in body.get("endpoint", ""):
+            assert "balance" in q and "fraudulent" not in q
+        elif "fraud" in body.get("endpoint", ""):
+            assert "fraudulent" in q

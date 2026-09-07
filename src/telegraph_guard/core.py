@@ -287,6 +287,11 @@ class Guard:
         natural-language query. Extra keys are ignored by every miner
         observed; a missing one is a hard failure.
         """
+        # The query alias must match the intent being asked, not default to
+        # the fraud phrasing — the receipts are public, and a balance call
+        # carrying "how likely … to be fraudulent?" reads as a mistake
+        # (observed in signal 0xca378ca8…, spotted by a user auditing it).
+        query = build_query(intent, target, target_type, chain)
         if intent == INTENT_TX or target_type == "tx":
             return {
                 "tx_hash": target,
@@ -294,20 +299,20 @@ class Guard:
                 "transaction_hash": target,
                 "tx": target,
                 "chain": chain,
-                "query": f"What was the status and gas used of transaction {target} on {chain}?",
+                "query": query,
             }
         if intent == INTENT_URL or target_type == "url":
             return {
                 "url": target,
                 "target": target,
-                "query": f"Is this URL safe to click: {target}?",
+                "query": query,
             }
         return {
             "address": target,
             "wallet": target,
             "account": target,
             "chain": chain,
-            "query": f"How likely is the address {target} on {chain} to be fraudulent?",
+            "query": query,
         }
 
     @staticmethod
