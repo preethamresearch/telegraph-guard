@@ -291,7 +291,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 function say(html, cls='bot', who='◆'){
   const d=document.createElement('div');
-  d.className='msg '+cls;
+  d.className='msg auto '+cls;
   d.innerHTML=`<div class="who">${who}</div><div class="bub">${html}</div>`;
   $('#msgs').appendChild(d);
   $('#msgs').scrollTop = $('#msgs').scrollHeight;
@@ -365,10 +365,9 @@ async function checkout(m, attempt){
 let busy=false;
 async function run(){
   if(busy) return; busy=true;
-  $('#run').disabled=true;
-  $('#intro').remove?.();
-  document.querySelectorAll('.block').forEach(b=>b.remove());
   const intro=$('#intro'); if(intro) intro.style.display='none';
+  document.querySelectorAll('.block').forEach(b=>b.remove());
+  document.querySelectorAll('.msg.auto').forEach(m=>m.remove());
 
   say('Searching merchants that accept agent payment…'); await wait(800);
   say('Found <b>3 offers</b>. Comparing price, delivery and stock.'); await wait(400);
@@ -418,9 +417,13 @@ async function run(){
 
 g.add_node(<span class="s">"guard"</span>, guard_node())
 g.add_conditional_edges(<span class="s">"guard"</span>, route_on_verdict,
-    {<span class="s">"execute"</span>: <span class="s">"pay"</span>, <span class="s">"abort"</span>: END, <span class="s">"human"</span>: <span class="s">"hitl"</span>})</div>`);
+    {<span class="s">"execute"</span>: <span class="s">"pay"</span>, <span class="s">"abort"</span>: END, <span class="s">"human"</span>: <span class="s">"hitl"</span>})</div>
+    <div class="cta" style="margin-top:18px">
+      <button class="primary" onclick="run()">Run it again</button>
+      <span class="note">each run makes fresh paid calls to live miners</span>
+    </div>`);
 
-  $('#run').disabled=false; busy=false;
+  busy=false;
 }
 $('#run').onclick=run;
 
