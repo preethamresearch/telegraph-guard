@@ -57,6 +57,20 @@ TX_HASHES = [
     "0xa8f01b2d722d3b624208c7eb3a1a9536429aef9ba9810037f5184e71edf32ee6",
     # The Bybit exploit transaction (Feb 2025), publicly documented.
     "0xb61413c495fdad6114a7aa863a00b2e3c28945979a10885b12b30316ea9f072c",
+    # Further real mainnet transactions, sampled to balance the corpus so the
+    # soak reaches 100 ONCHAIN_TX_LOOKUP signals without re-screening the same
+    # handful of hashes many times over.
+    "0xfbdd99b53af1ea8e2eb8814d97c3ffb1c577a19ac2b5241e1ee42f8635ed39c6",
+    "0x2a2b361f4dbbf168f35e7de4cf8250ea7f0599d8f82e833ff037a954c5c46582",
+    "0x0060ec137ddeaa79c16187e8d08d361345fdb3c4a147c71ab09a760b5bfcfea1",
+    "0x8cec02ba4aa4e76db3c4deeb8fcd4d043b056e37667021f6f7f103d00d1c377c",
+    "0x3e244089c80f65f100cda27667ab274408e31bb30f947d892db14085ab514459",
+    "0x7ccf8cefd042bec021758e86d3b65baae8dc05666ca4048f238238c2f480586f",
+    "0x929e750ad99b161a0ad1380d9b1b461b29c1af946e39bdb66dfd540fc36dcf1c",
+    "0xf1378274cfd9e8f7f8e53a81d9d08b74dc13b99ae7812cdd4807b6fbfb015b25",
+    "0xe4e576ecedb242b4b692dbf3a2c6c218f69e8f4183cad57b40dc21fa72806c60",
+    "0x909ae0f9016024fff9a8223e029a68d2b6decc2e98a2ac4cbe869fecf4d02cae",
+    "0x11d24787c4dd3da8157e359e182c3cd2352840f85f51b2f9484d1e60dfac1325",
 ]
 
 # --- URLs expected to screen clean ------------------------------------------
@@ -69,6 +83,12 @@ SAFE_URLS = [
     "https://www.circle.com",
     "https://base.org",
     "https://x402.org",
+    "https://www.coinbase.com",
+    "https://etherscan.io",
+    "https://metamask.io",
+    "https://www.ledger.com",
+    "https://opensea.io",
+    "https://chain.link",
 ]
 
 # --- URLs expected to screen dirty ------------------------------------------
@@ -78,8 +98,23 @@ SAFE_URLS = [
 TEST_MALICIOUS_URLS = [
     "http://testsafebrowsing.appspot.com/s/phishing.html",
     "http://testsafebrowsing.appspot.com/s/malware.html",
-    "http://testsafebrowsing.appspot.com/apiv4/ANY_PLATFORM/SOCIAL_ENGINEERING/URL/",
-    "http://malware.testing.google.test/testing/malware/",
+]
+
+# Live malware-distribution URLs from the URLhaus public blocklist, each
+# marked `online` when sampled. Screening a known-bad URL is the defensive
+# case this product exists for; nothing here is fetched, only submitted to
+# scanners. Entries expire as hosts are taken down — refresh from
+# https://urlhaus.abuse.ch/downloads/csv_recent/ if separation degrades.
+BLOCKLIST_URLS = [
+    "http://123.11.64.164:34556/i",
+    "http://60.23.231.167:55225/i",
+    "http://105.186.81.49:43127/bin.sh",
+    "http://61.53.95.155:37419/i",
+    "http://103.156.176.162:53592/bin.sh",
+    "http://60.23.239.84:49851/i",
+    "http://182.116.64.244:57147/i",
+    "http://115.57.253.17:53774/i",
+    "http://177.84.28.156:44034/bin.sh",
 ]
 
 #: Interleaved so each round exercises all four intents and both risk poles,
@@ -91,6 +126,7 @@ for _group in (
     TX_HASHES,
     SAFE_URLS,
     TEST_MALICIOUS_URLS,
+    BLOCKLIST_URLS,
     ENS_NAMES,
 ):
     TARGETS.extend(_group)
@@ -103,4 +139,5 @@ __all__ = [
     "TX_HASHES",
     "SAFE_URLS",
     "TEST_MALICIOUS_URLS",
+    "BLOCKLIST_URLS",
 ]

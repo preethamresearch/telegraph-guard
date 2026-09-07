@@ -63,7 +63,16 @@ async def run(args: argparse.Namespace) -> int:
     miner_names: dict[str, str] = {}
     rows: list[dict] = []
 
-    cfg = GuardConfig(deadline_ms=args.deadline_ms, min_signals=1)
+    # Pin the calibrated miners (FR-5). The auto-router lands
+    # FRAUD_DETECTION on ChainSight, which returns the same canned prose for a
+    # clean router as for a sanctioned mixer — routing 100+ signals through it
+    # would generate volume with no judgement behind it.
+    cfg = GuardConfig(
+        deadline_ms=args.deadline_ms,
+        min_signals=1,
+        miners=args.miners.split(","),
+        miners_per_intent=args.miners_per_intent,
+    )
     guard = Guard(cfg)
 
     log = LOG_PATH.open("a")
@@ -194,6 +203,8 @@ def main() -> int:
     p.add_argument("--pace", type=float, default=1.0, help="seconds between targets (NFR-8)")
     p.add_argument("--deadline-ms", type=int, default=15000)
     p.add_argument("--max-rounds", type=int, default=20)
+    p.add_argument("--miners", default="9002,95822412,20260828,5001,302")
+    p.add_argument("--miners-per-intent", type=int, default=1)
     p.add_argument("--warmup", action="store_true")
     p.add_argument("--dry-run", action="store_true", help="no paid calls")
     return asyncio.run(run(p.parse_args()))
