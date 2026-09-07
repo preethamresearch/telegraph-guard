@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telegraph-guard"
+version = "0.1.0"
+description = "Pre-transaction safety gate for AI agents that hold wallets, backed by Telegraph miners."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "TelegraphGuard" }]
+keywords = ["x402", "telegraph", "agents", "fraud-detection", "langgraph", "crewai"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+]
+dependencies = [
+  "httpx>=0.28.1",
+  "x402[evm,httpx]>=2.22.0",
+  "eth-account>=0.13.0",
+]
+
+[project.optional-dependencies]
+langgraph = ["langgraph>=0.2"]
+crewai = ["crewai>=0.80"]
+demo = ["langgraph>=0.2", "web3>=7.0"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[project.scripts]
+telegraph-guard = "telegraph_guard.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/telegraph-guard/telegraph-guard"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/telegraph_guard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
