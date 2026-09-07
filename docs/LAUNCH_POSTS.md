@@ -7,6 +7,9 @@ drafts for you to send.
 Fill in before posting:
 - `https://github.com/preethamresearch/telegraph-guard` — the public GitHub URL
 - `<VIDEO>` — the demo video link
+- Live demo URL (already filled): https://tape-hybrid-restoration-commodity.trycloudflare.com
+  — a tunnel to the demo machine. It dies if the laptop sleeps; re-run
+  `cloudflared tunnel --url http://127.0.0.1:8402` for a fresh URL and update posts.
 - `<HANDLE>` — your X handle, if you want it in the Discord post
 
 **Measured figures** (from `soak-signals.jsonl`, `HASHES.md`, and six
@@ -41,6 +44,9 @@ consecutive live demo runs):
 >
 > So I built TelegraphGuard: a pre-transaction safety gate for agents, running
 > on @Telegraphprotoc miners.
+>
+> Try it live (each screening is a real paid call to live miners):
+> https://tape-hybrid-restoration-commodity.trycloudflare.com
 >
 > <VIDEO>
 

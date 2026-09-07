@@ -18,7 +18,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -48,6 +48,38 @@ _lock = asyncio.Lock()
 
 class ScreenRequest(BaseModel):
     target: str
+
+
+# --- public-deployment guardrails -------------------------------------------
+#
+# Each screening spends real USDC from the demo wallet, so a public URL
+# needs a per-IP rate limit and a global session cap: an abuser can waste
+# at most the cap, not the wallet.
+
+import time as _time
+
+_PER_IP_LIMIT = 8          # screenings per IP per 10 minutes
+_PER_IP_WINDOW = 600.0
+_GLOBAL_CAP = 300          # screenings per server session (~$9 worst case)
+_ip_hits: dict[str, list[float]] = {}
+_served = 0
+
+
+def _rate_check(ip: str) -> str | None:
+    global _served
+    if _served >= _GLOBAL_CAP:
+        return (
+            "This shared demo has hit its session budget. Run it yourself in two "
+            "minutes: github.com/preethamresearch/telegraph-guard"
+        )
+    now = _time.monotonic()
+    hits = [t for t in _ip_hits.get(ip, []) if now - t < _PER_IP_WINDOW]
+    if len(hits) >= _PER_IP_LIMIT:
+        return "Rate limit: 8 screenings per 10 minutes — each one spends real testnet USDC."
+    hits.append(now)
+    _ip_hits[ip] = hits
+    _served += 1
+    return None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -108,7 +140,14 @@ async def status() -> JSONResponse:
 
 
 @app.post("/api/screen")
-async def screen(req: ScreenRequest) -> JSONResponse:
+async def screen(req: ScreenRequest, request: Request) -> JSONResponse:
+    ip = request.headers.get("cf-connecting-ip") or (
+        request.client.host if request.client else "?"
+    )
+    limited = _rate_check(ip)
+    if limited:
+        return JSONResponse({"error": limited}, status_code=429)
+
     target = (req.target or "").strip()
     if not target:
         return JSONResponse({"error": "no target supplied"}, status_code=400)
