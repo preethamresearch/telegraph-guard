@@ -204,6 +204,10 @@
 <div class="top"><div class="in">
   <div class="brand"><span class="mk">◆</span> Vessel <small>agent checkout</small></div>
   <div class="sp"></div>
+  <a class="badge" id="wallet" href="#" target="_blank" rel="noopener"
+     style="text-decoration:none" title="the agent's wallet on Base Sepolia — every screening is paid from here">
+    <span class="lamp" style="background:var(--brand);box-shadow:0 0 0 3px #4338ca22"></span>
+    <span id="wtext">wallet…</span></a>
   <span class="badge"><span class="lamp"></span><span id="mcount">connecting…</span></span>
   <span class="badge">guarded by TelegraphGuard</span>
 </div></div>
@@ -301,7 +305,10 @@ function add(html){ const d=document.createElement('div'); d.className='block';
   d.innerHTML=html; $('#canvas').appendChild(d); return d; }
 
 const screen = t => fetch('/api/screen',{method:'POST',
-  headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t})}).then(r=>r.json());
+  headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t})})
+  .then(r=>r.json())
+  // A screening just spent from the wallet — update the header balance.
+  .then(d=>{ try{ refreshStatus(); }catch(e){} return d; });
 
 function card(m,cls,tag){
   // Real product photography if scripts/gen_images.py has run; SVG otherwise.
@@ -458,10 +465,23 @@ async function ask(){
 $('#goBtn').onclick=ask;
 $('#q').addEventListener('keydown',e=>{if(e.key==='Enter')ask();});
 
-(async()=>{try{const d=await (await fetch('/api/status')).json();
-  if(d.ok){const n=Object.values(d.miners).reduce((a,b)=>a+b,0);
-    $('#mcount').textContent=`${n} live miners`;}
-}catch(e){$('#mcount').textContent='offline';}})();
+async function refreshStatus(){
+  try{
+    const d=await (await fetch('/api/status')).json();
+    if(d.ok){const n=Object.values(d.miners).reduce((a,b)=>a+b,0);
+      $('#mcount').textContent=`${n} live miners`;}
+    if(d.signer){
+      const bal = (d.usdc===null||d.usdc===undefined) ? '?' : d.usdc.toFixed(2);
+      $('#wtext').innerHTML=`<b>${d.signer.slice(0,6)}…${d.signer.slice(-4)}</b> · ${bal} USDC`;
+      if(d.explorer) $('#wallet').href=d.explorer;
+    } else {
+      $('#wtext').textContent='no wallet key';
+    }
+  }catch(e){$('#mcount').textContent='offline';}
+}
+refreshStatus();
+// Each screening spends real USDC — keep the header honest about it.
+setInterval(refreshStatus, 20000);
 </script>
 </body>
 </html>

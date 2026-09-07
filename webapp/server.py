@@ -55,21 +55,51 @@ async def index() -> str:
     return (HERE / "index.html").read_text(encoding="utf-8")
 
 
+BASE_SEPOLIA_RPC = "https://sepolia.base.org"
+USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+
+
+async def _usdc_balance(addr: str) -> float | None:
+    """Live USDC balance of the agent wallet, read straight from Base Sepolia."""
+    import httpx
+
+    data = "0x70a08231" + addr[2:].lower().rjust(64, "0")
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.post(
+                BASE_SEPOLIA_RPC,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "eth_call",
+                    "params": [{"to": USDC_BASE_SEPOLIA, "data": data}, "latest"],
+                },
+            )
+            return int(r.json()["result"], 16) / 1e6
+    except Exception:
+        return None
+
+
 @app.get("/api/status")
 async def status() -> JSONResponse:
     try:
         addr = signer_address()
     except PaymentUnavailable:
         addr = None
+    balance = await _usdc_balance(addr) if addr else None
     try:
         reg = await _guard.registry()
         miners = {i: len(ms) for i, ms in reg.by_intent.items()}
     except Exception as exc:
-        return JSONResponse({"ok": False, "error": str(exc), "signer": addr})
+        return JSONResponse(
+            {"ok": False, "error": str(exc), "signer": addr, "usdc": balance}
+        )
     return JSONResponse(
         {
             "ok": True,
             "signer": addr,
+            "usdc": balance,
+            "explorer": f"https://sepolia.basescan.org/address/{addr}" if addr else None,
             "miners": miners,
             "version": __version__,
             "thresholds": {"allow_below": _cfg.allow_below, "block_above": _cfg.block_above},
