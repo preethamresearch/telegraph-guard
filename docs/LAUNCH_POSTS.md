@@ -33,82 +33,28 @@ consecutive live demo runs):
 
 # X thread
 
-### Post 1 — what it is
+**3 posts, each verified ≤280 chars (URLs count as 23 on X). Post as a thread,
+in order. Add the video link to post 1 when it exists (a link replaces 23 chars
+— it still fits).**
 
-> AI agents have wallets now. In May a prompt injection drained ~$204K from the
-> Grok/Bankr agent — it turned text it read into a transfer without ever
-> checking the destination.
->
-> Allowlists and spend limits are policy. They can't tell you if an address is
-> actually safe.
->
-> So I built TelegraphGuard: a pre-transaction safety gate for agents, running
-> on @Telegraphprotoc miners.
->
-> Try it live (each screening is a real paid call to live miners):
-> https://preethamresearch.github.io/telegraph-guard/
->
-> <VIDEO>
+### Post 1 — hook + live demo
 
-### Post 2 — the demo
+AI agents have wallets now — and prompt injections are draining them.
 
-> One agent, three invoices, one LangGraph node between its intent and its
-> wallet:
->
-> ALLOW  0.10 — Uniswap router
-> BLOCK  0.80 — OFAC-sanctioned Tornado Cash
-> BLOCK  0.90 — live malware URL from URLhaus
->
-> Every call paid over x402, answered by live @Telegraphprotoc miners. No mocks.
+I built TelegraphGuard: a safety gate that screens every payment destination through live @Telegraphprotoc miners before money moves.
 
-### Post 3 — receipts
+Try it live: https://preethamresearch.github.io/telegraph-guard/
 
-> The part I care about: every @Telegraphprotoc verdict carries an on-chain
-> signal_hash.
->
-> You don't have to trust my API. Open the receipt and see which miner answered,
-> and when.
->
-> 590 signals published in HASHES.md, all verifiable:
-> https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
+### Post 2 — the proof
 
-### Post 4 — numbers, and the honest part
+One agent, 3 merchants. The cheapest settles to an OFAC-sanctioned mixer — blocked at risk 0.80, on-chain receipt attached. The agent falls back and buys safely.
 
-> Final numbers, all measured:
->
-> · 590 verified signals across 4 intents
-> · 265 FRAUD · 125 URL_SCAN · 100 WALLET · 100 TX
-> · 6/6 live demo runs
-> · 37/39 correct on a labelled corpus
->
-> The 2 misses were @Telegraphprotoc miner coverage gaps, not aggregation
-> bugs. Details in the repo — I'd rather publish them than hide them.
->
-> https://github.com/preethamresearch/telegraph-guard
+590 verified @Telegraphprotoc signals, all auditable:
+https://github.com/preethamresearch/telegraph-guard
 
-### Post 5 — flywheel evidence (this is what the judges say they want)
+### Post 3 — flywheel evidence (what the judges say they want)
 
-> The hackathon brief says: "We are not looking for the best demo. We are
-> looking for real evidence that the quality flywheel works."
->
-> Evidence from routing 590 real calls on @Telegraphprotoc:
->
-> · Miner quality differs measurably: one FRAUD miner returned identical prose
->   for a clean router and an OFAC-sanctioned mixer; another separated them
->   0.10 vs 0.80.
-> · Demand followed quality: after calibration, 435 of our FRAUD calls went to
->   the miner that discriminates.
-> · That demand is published per-miner, so it feeds their rankings.
->
-> Better miners earned our traffic. That's the flywheel, observed.
-
-### Post 6 — the ask (optional)
-
-> If you run a FRAUD_DETECTION miner on @Telegraphprotoc: TelegraphGuard sends
-> you real demand from agents that are about to move money.
->
-> The bottleneck isn't routing, it's coverage. A bare address needs a 0-1 risk
-> score and a stated confidence. Build that and I'll route to you.
+Flywheel evidence @Telegraphprotoc asked for: miner quality differs (one scored a mixer & a clean router identically; another split them 0.80 vs 0.10). Our demand followed quality — 435 calls to the better miner, published so it feeds their rankings. 37/39 on a labelled corpus.
 
 ---
 
