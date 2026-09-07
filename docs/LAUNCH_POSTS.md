@@ -31,11 +31,11 @@ consecutive live demo runs):
 
 ---
 
-# X thread
+# X posts
 
-**3 posts, each verified ≤280 chars (URLs count as 23 on X). Post as a thread,
-in order. Add the video link to post 1 when it exists (a link replaces 23 chars
-— it still fits).**
+**6 posts, each verified ≤280 chars (URLs count as 23 on X). Each stands alone —
+post any one, several, or all as a thread. Every post tags @Telegraphprotoc
+(rule 03). Add the video link to post 1 when it exists.**
 
 ### Post 1 — hook + live demo
 
@@ -45,16 +45,38 @@ I built TelegraphGuard: a safety gate that screens every payment destination thr
 
 Try it live: https://preethamresearch.github.io/telegraph-guard/
 
-### Post 2 — the proof
+### Post 2 — the demo story
 
-One agent, 3 merchants. The cheapest settles to an OFAC-sanctioned mixer — blocked at risk 0.80, on-chain receipt attached. The agent falls back and buys safely.
+Gave a shopping agent $150 and three merchants. The cheapest settles to an OFAC-sanctioned mixer.
 
-590 verified @Telegraphprotoc signals, all auditable:
+@Telegraphprotoc miners flagged it — risk 0.80, payment blocked, receipt on-chain. The agent fell back and bought safely.
+
+https://preethamresearch.github.io/telegraph-guard/
+
+### Post 3 — receipts
+
+Every TelegraphGuard verdict carries an on-chain signal_hash from @Telegraphprotoc. You don't trust my API — you open the receipt and see which miner answered.
+
+590 verified signals published:
+https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
+
+### Post 4 — numbers, honestly
+
+TelegraphGuard by the numbers on @Telegraphprotoc: 590 verified signals · 4 intents · 6/6 live demo runs · 37/39 on a labelled corpus.
+
+The 2 misses were miner coverage gaps — published in the repo, not hidden.
+
 https://github.com/preethamresearch/telegraph-guard
 
-### Post 3 — flywheel evidence (what the judges say they want)
+### Post 5 — flywheel evidence
 
-Flywheel evidence @Telegraphprotoc asked for: miner quality differs (one scored a mixer & a clean router identically; another split them 0.80 vs 0.10). Our demand followed quality — 435 calls to the better miner, published so it feeds their rankings. 37/39 on a labelled corpus.
+Flywheel evidence @Telegraphprotoc asked for: miner quality differs (one scored a mixer & a clean router identically; another split them 0.80 vs 0.10). Our demand followed quality — 435 calls to the better miner, published so it feeds their rankings.
+
+### Post 6 — the ask to miners
+
+If you run a FRAUD_DETECTION miner on @Telegraphprotoc: TelegraphGuard routes real demand from agents about to move money.
+
+What's missing: more miners that take a bare address and return a 0-1 risk score + confidence. Build it and I'll route to you.
 
 ---
 
