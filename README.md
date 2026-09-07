@@ -102,6 +102,34 @@ from telegraph_guard.crewai import TelegraphGuardTool
 agent = Agent(role="Treasurer", tools=[TelegraphGuardTool(), PayTool()], ...)
 ```
 
+### MCP
+
+Expose screening to any MCP client — Claude Desktop, Cursor, or a shared gateway.
+
+```bash
+pip install 'telegraph-guard[mcp]'
+telegraph-guard-mcp                                    # stdio
+telegraph-guard-mcp --transport streamable-http --port 8402
+```
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "telegraph-guard": {
+      "command": "telegraph-guard-mcp",
+      "env": { "TELEGRAPH_GUARD_KEY": "0x..." }
+    }
+  }
+}
+```
+
+Two tools are exposed: `screen` (returns the verdict, the reasons, and every
+signal with its verify URL) and `list_miners` (which miners back each intent,
+for auditing a verdict). Thresholds are set with the same flags as the CLI, so
+a gateway operator can run a stricter guard than the default.
+
 ---
 
 ## How it works

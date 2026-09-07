@@ -25,11 +25,13 @@ dependencies = [
 [project.optional-dependencies]
 langgraph = ["langgraph>=0.2"]
 crewai = ["crewai>=0.80"]
+mcp = ["mcp>=2.0"]
 demo = ["langgraph>=0.2", "web3>=7.0"]
 dev = ["pytest>=8", "pytest-asyncio>=0.24"]
 
 [project.scripts]
 telegraph-guard = "telegraph_guard.cli:main"
+telegraph-guard-mcp = "telegraph_guard.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/telegraph-guard/telegraph-guard"
