@@ -162,9 +162,10 @@ def _finish(intent: str, r: httpx.Response, elapsed: int) -> Signal:
             intent=intent,
             duration_ms=elapsed,
             error=(
-                "payment rejected at settlement — the signer is most likely out of "
-                "Base Sepolia USDC. Check the balance of the address printed by "
-                "`telegraph-guard wallet` and top it up at https://faucet.circle.com"
+                "payment rejected at settlement — either the signer is out of Base "
+                "Sepolia USDC (check `telegraph-guard wallet`, top up at "
+                "https://faucet.circle.com), or concurrent authorizations from the "
+                "same wallet raced each other"
             ),
         )
 
@@ -193,3 +194,14 @@ def _finish(intent: str, r: httpx.Response, elapsed: int) -> Signal:
 
 def was_rate_limited(sig: Signal) -> bool:
     return bool(getattr(sig, "rate_limited", False))
+
+
+def was_payment_rejected(sig: Signal) -> bool:
+    """A 402 that survived the x402 transport.
+
+    Observed live with a wallet holding 18 USDC: firing several paid calls
+    concurrently from one signer makes some settlements race and get
+    rejected. That is transient and worth one retry — unlike a genuinely
+    empty wallet, where the retry simply fails again and costs nothing.
+    """
+    return bool(sig.error and "payment rejected at settlement" in sig.error)

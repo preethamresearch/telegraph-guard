@@ -50,6 +50,13 @@ class GuardConfig:
     #: Direct-miner mode (FR-5). When set, calls POST /engine/v1/ask/{id}
     #: instead of the auto-routed path.
     miners: list[str] | None = None
+    #: How many miners to query concurrently for each risk-bearing intent
+    #: (FRAUD_DETECTION, URL_SCAN). Miner coverage is partial and uptime is
+    #: uneven: a single miner failing over left the gate with no judgement at
+    #: all in roughly one run in four. Redundancy costs one extra call per
+    #: primary intent and removes that class of flake. Context intents
+    #: (wallet, tx) stay single — they inform a verdict, never carry one.
+    miners_per_intent: int = 1
     chain: str = "ethereum"
     verbose: bool = False
 
@@ -62,6 +69,8 @@ class GuardConfig:
             raise ValueError("allow_below must be <= block_above")
         if self.min_signals < 1:
             raise ValueError("min_signals must be >= 1")
+        if self.miners_per_intent < 1:
+            raise ValueError("miners_per_intent must be >= 1")
 
 
 @dataclass

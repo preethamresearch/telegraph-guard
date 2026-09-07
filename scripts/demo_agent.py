@@ -171,8 +171,20 @@ async def main() -> int:
     p.add_argument("--deadline-ms", type=int, default=15000)
     p.add_argument(
         "--miners",
-        default="9002,10002,20260828",
+        # Priority order per intent, best first. 9002 TxLens is the only
+        # FRAUD miner observed to discriminate; 95822412 Refut states a real
+        # confidence and serves as the second opinion. DegenLens (10002) is
+        # deliberately not here — it answers confidence 0.00 for these
+        # addresses, which is no information at all.
+        default="9002,95822412,20260828,5001",
         help="miner ids to pin for the run (FR-5 direct mode)",
+    )
+    p.add_argument(
+        "--miners-per-intent",
+        type=int,
+        default=2,
+        help="concurrent miners per risk-bearing intent; 2 covers a miner "
+        "failing over mid-run",
     )
     p.add_argument(
         "--replay",
@@ -189,7 +201,11 @@ async def main() -> int:
     # /assess-wallet checks a registry of 2,600+ OFAC and scam entities and
     # separates the same targets cleanly. This is what FR-5 is for: pinning
     # miners for a deterministic demo.
-    cfg = GuardConfig(deadline_ms=args.deadline_ms, miners=args.miners.split(","))
+    cfg = GuardConfig(
+        deadline_ms=args.deadline_ms,
+        miners=args.miners.split(","),
+        miners_per_intent=args.miners_per_intent,
+    )
     guard = replay_guard(cfg) if args.replay else Guard(cfg)
     app = build_graph(guard, cfg, send=not args.replay and not args.no_send)
 

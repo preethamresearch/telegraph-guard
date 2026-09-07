@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from .aggregate import aggregate
+from .aggregate import PRIMARY_INTENTS, aggregate
 from .classify import classify, intents_for, normalize
 from .discovery import Miner, Registry, fetch_registry
 from .engine import (
@@ -21,6 +21,7 @@ from .engine import (
     ask_auto,
     ask_direct,
     build_payment_client,
+    was_payment_rejected,
     was_rate_limited,
 )
 from .extract import extract_confidence, extract_risk
@@ -161,13 +162,19 @@ class Guard:
         target: str,
         target_type: TargetType,
         config: GuardConfig,
+        slot: int = 0,
     ) -> Signal:
         client = await self._paid()
         query = build_query(intent, target, target_type, config.chain)
         context = {"chain": config.chain, "target_type": target_type}
 
-        if config.miners:
-            sig = await self._direct_with_retry(client, intent, target, target_type, config)
+        if config.miners or slot > 0:
+            # slot > 0 is a redundant caller: go direct so it lands on a
+            # different miner than slot 0 rather than racing for the same
+            # auto-routed one.
+            sig = await self._direct_with_retry(
+                client, intent, target, target_type, config, slot=slot
+            )
         else:
             sig = await ask_auto(client, intent, query, context)
             if was_rate_limited(sig):
@@ -175,6 +182,18 @@ class Guard:
                 sig = await self._direct_with_retry(
                     client, intent, target, target_type, config, skip=sig.miner_id
                 )
+
+        # Concurrent x402 authorizations from one signer can race at
+        # settlement. Back off by a slot-staggered interval so the retries do
+        # not collide again, then try once more.
+        if was_payment_rejected(sig):
+            await asyncio.sleep(0.4 + 0.35 * slot)
+            if config.miners or slot > 0:
+                sig = await self._direct_with_retry(
+                    client, intent, target, target_type, config, slot=slot
+                )
+            else:
+                sig = await ask_auto(client, intent, query, context)
 
         self._decorate(sig)
         self._log(sig, target)
@@ -188,6 +207,7 @@ class Guard:
         target_type: TargetType,
         config: GuardConfig,
         skip: str | None = None,
+        slot: int = 0,
     ) -> Signal:
         reg = await self.registry()
         candidates = reg.miners_for(intent)
@@ -203,8 +223,20 @@ class Guard:
         if skip:
             candidates = [m for m in candidates if m.id != skip]
 
+        # Each redundant slot starts further down the list, so concurrent
+        # callers for one intent hit different miners instead of duplicating.
+        usable = [m for m in candidates if m.endpoint_for(intent) is not None]
+        if slot and usable:
+            candidates = usable[slot:] + usable[:slot]
+
+        # With redundancy on, each slot owns exactly one miner. Letting a slot
+        # fall back would land it on the miner the next slot already holds —
+        # observed live, both FRAUD slots collapsed onto DegenLens and TxLens
+        # was never asked at all. Redundancy across slots replaces the retry.
+        attempts = 1 if config.miners_per_intent > 1 else 2
+
         last: Signal | None = None
-        for miner in candidates[:2]:  # FR-12: one retry, not a stampede.
+        for miner in candidates[:attempts]:  # FR-12: one retry, not a stampede.
             ep = miner.endpoint_for(intent)
             if ep is None:
                 continue
@@ -315,10 +347,20 @@ class Guard:
         norm = normalize(target, target_type)
         intents = intents_for(target_type)
 
-        tasks = [
-            asyncio.create_task(self._one_signal(i, norm, target_type, cfg))
-            for i in intents
-        ]
+        # Risk-bearing intents get `miners_per_intent` concurrent miners, each
+        # starting at a different point in the candidate list. Serial fallback
+        # was not enough: when the preferred miner failed, its replacement had
+        # to be discovered and called inside the same deadline, and often
+        # returned nothing usable.
+        tasks = []
+        for intent in intents:
+            n = cfg.miners_per_intent if intent in PRIMARY_INTENTS else 1
+            for slot in range(n):
+                tasks.append(
+                    asyncio.create_task(
+                        self._one_signal(intent, norm, target_type, cfg, slot=slot)
+                    )
+                )
 
         # FR-10: signals that miss the deadline are dropped, not awaited.
         done, pending = await asyncio.wait(tasks, timeout=cfg.deadline_ms / 1000.0)

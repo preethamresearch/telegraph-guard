@@ -382,3 +382,64 @@ def test_queries_match_engine_intent_descriptions():
 def test_url_fraud_query_does_not_ask_about_an_address():
     q = build_query(INTENT_FRAUD, URL, "url", "ethereum")
     assert "address" not in q.lower()
+
+
+# --- redundancy on risk-bearing intents -------------------------------------
+#
+# Live, TxLens intermittently failed over and the replacement returned nothing
+# usable, so roughly one run in four lost the fraud verdict entirely. Querying
+# a second miner concurrently removes that class of flake.
+
+
+async def test_second_miner_covers_a_failing_first():
+    """The preferred fraud miner dies; the redundant one still decides."""
+    calls: list[str] = []
+
+    async def handler(request):
+        body = json.loads(request.content or b"{}")
+        calls.append(request.url.path)
+        intent = FakeEngine._intent_of(request.url.path, body)
+        if intent == INTENT_WALLET:
+            return httpx.Response(200, json=engine_reply(
+                INTENT_WALLET, "302", "ChainSight", {"tx_count": 500}))
+        # miner 302 (slot 0) is down; 9002 (slot 1) answers.
+        if request.url.path.endswith("/302"):
+            return httpx.Response(503, json={"error": "upstream down"})
+        return httpx.Response(200, json=engine_reply(
+            INTENT_FRAUD, "9002", "TxLens", {"risk_score": 0.93, "confidence": 0.9}))
+
+    g = Guard(
+        GuardConfig(miners=["302", "9002"], miners_per_intent=2, min_signals=1),
+        registry=REGISTRY,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    v = await g.screen(ADDR)
+
+    assert v.verdict == "block"
+    assert any(s.ok and s.risk == pytest.approx(0.93) for s in v.signals)
+
+
+async def test_redundancy_only_applies_to_risk_bearing_intents():
+    """Wallet/tx inform a verdict, they never carry one — no extra spend."""
+    fake = FakeEngine({
+        INTENT_FRAUD: engine_reply(INTENT_FRAUD, "9002", "TxLens",
+                                   {"risk_score": 0.1, "confidence": 0.8}),
+        INTENT_WALLET: engine_reply(INTENT_WALLET, "302", "ChainSight",
+                                    {"tx_count": 900}),
+    })
+    cfg = GuardConfig(miners=["9002", "302"], miners_per_intent=2, min_signals=1)
+    await guard_with(fake, cfg).screen(ADDR)
+
+    wallet_calls = [
+        b for _, b in fake.requests
+        if FakeEngine._intent_of("/engine/v1/ask/x", b) == INTENT_WALLET
+    ]
+    assert len(wallet_calls) == 1, "wallet intent must not be duplicated"
+    assert len(fake.requests) == 3, "2 fraud + 1 wallet"
+
+
+def test_miners_per_intent_defaults_to_one():
+    """Redundancy costs an extra call, so it is opt-in."""
+    assert GuardConfig().miners_per_intent == 1
+    with pytest.raises(ValueError):
+        GuardConfig(miners_per_intent=0)
