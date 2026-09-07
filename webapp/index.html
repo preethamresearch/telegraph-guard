@@ -3,252 +3,229 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vessel — agent checkout, guarded</title>
+<title>Vessel — agent checkout</title>
 <style>
   :root{
-    /* high-contrast light surface */
-    --page:#F6F7F9; --card:#FFFFFF; --sunk:#F1F3F6;
-    --ink:#0B0D12;          /* 17.6:1 on white */
-    --ink2:#3D4657;         /* 8.9:1  */
-    --ink3:#6B7689;         /* 4.8:1  */
-    --line:#E3E7ED; --line2:#CFD6E0;
-    --brand:#4338CA; --brand-soft:#EEF0FE;
-    --safe:#047857; --safe-soft:#E7F6F0;
-    --danger:#BE123C; --danger-soft:#FDECF1;
-    --warn:#B45309; --warn-soft:#FDF3E3;
-    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
-    --sh-1:0 1px 2px #0b0d1208, 0 1px 3px #0b0d120a;
-    --sh-2:0 4px 10px -2px #0b0d1214, 0 12px 28px -8px #0b0d1218;
-    --sh-3:0 10px 24px -6px #0b0d121f, 0 24px 56px -12px #0b0d1226;
+    --page:#F7F7F6; --card:#FFFFFF; --sunk:#F2F2F1;
+    --ink:#191817; --ink2:#454340; --ink3:#7A776F;
+    --line:#E6E4E1; --line2:#D5D2CD;
+    --link:#1D4ED8;
+    --safe:#0B6E4F; --safe-bg:#EDF7F2; --safe-line:#C4E3D4;
+    --danger:#B3261E; --danger-bg:#FBEFEE; --danger-line:#EFCFCC;
+    --warn:#8A5A00; --warn-bg:#FAF3E4; --warn-line:#EADFC0;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
   body{margin:0;background:var(--page);color:var(--ink);
-    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     -webkit-font-smoothing:antialiased}
-  a{color:var(--brand);text-underline-offset:2px}
+  a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
   .mono{font-family:var(--mono)}
+  button{font-family:inherit;cursor:pointer}
 
-  /* ---------- app chrome ---------- */
+  /* ---- chrome ---- */
   .top{background:var(--card);border-bottom:1px solid var(--line);
     position:sticky;top:0;z-index:20}
-  .top .in{max-width:1240px;margin:0 auto;padding:0 26px;height:60px;
-    display:flex;align-items:center;gap:12px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;
-    letter-spacing:-.3px}
-  .brand .mk{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
-    background:linear-gradient(140deg,#4338CA,#7C3AED);color:#fff;font-size:14px;
-    box-shadow:0 2px 8px #4338ca4d}
-  .brand small{font-weight:500;color:var(--ink3);font-size:13px;letter-spacing:0}
+  .top .in{max-width:1200px;margin:0 auto;padding:0 24px;height:52px;
+    display:flex;align-items:center;gap:20px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:650;font-size:14.5px}
+  .logo .mk{width:22px;height:22px;border-radius:6px;background:var(--ink);
+    color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:700}
+  .logo small{color:var(--ink3);font-weight:450;font-size:12.5px}
   .top .sp{flex:1}
-  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:550;
-    color:var(--ink2);background:var(--sunk);border:1px solid var(--line);
-    border-radius:999px;padding:5px 12px}
-  .badge .lamp{width:6px;height:6px;border-radius:50%;background:var(--safe);
-    box-shadow:0 0 0 3px #04785722}
+  .meta{display:flex;gap:18px;font-size:12.5px;color:var(--ink3);align-items:center}
+  .meta b{color:var(--ink2);font-weight:550}
+  .meta .dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--safe);margin-right:6px;vertical-align:1px}
 
-  .shell{max-width:1240px;margin:0 auto;padding:26px;
-    display:grid;grid-template-columns:396px 1fr;gap:26px;align-items:start}
-  @media(max-width:1000px){.shell{grid-template-columns:1fr}}
+  .shell{max-width:1200px;margin:0 auto;padding:22px 24px;
+    display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start}
+  @media(max-width:980px){.shell{grid-template-columns:1fr}}
 
-  /* ---------- left: agent thread ---------- */
-  .thread{background:var(--card);border:1px solid var(--line);border-radius:18px;
-    box-shadow:var(--sh-1);overflow:hidden;position:sticky;top:86px}
-  .thread .hd{padding:16px 18px;border-bottom:1px solid var(--line);
+  /* ---- chat ---- */
+  .chat{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;position:sticky;top:74px;display:flex;flex-direction:column;
+    max-height:calc(100vh - 100px)}
+  .chat .hd{padding:13px 16px;border-bottom:1px solid var(--line);
     display:flex;align-items:center;gap:10px}
-  .thread .hd .av{width:30px;height:30px;border-radius:10px;
-    background:linear-gradient(140deg,#4338CA,#7C3AED);color:#fff;
-    display:grid;place-items:center;font-size:13px;font-weight:700}
-  .thread .hd b{font-size:14.5px}
-  .thread .hd span{display:block;font-size:12px;color:var(--ink3);font-weight:450}
-  .msgs{padding:16px 18px;max-height:min(64vh,620px);overflow-y:auto}
-  .msg{display:flex;gap:10px;margin-bottom:16px;animation:rise .34s both}
-  @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
-  .msg .who{width:26px;height:26px;border-radius:8px;flex:none;display:grid;
-    place-items:center;font-size:11px;font-weight:700}
-  .msg.user .who{background:#E8EAF0;color:var(--ink2)}
-  .msg.bot .who{background:var(--brand-soft);color:var(--brand)}
-  .msg .bub{font-size:14px;color:var(--ink2);padding-top:3px}
+  .chat .hd .av{width:26px;height:26px;border-radius:6px;background:var(--ink);
+    color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+  .chat .hd b{font-size:13.5px;display:block}
+  .chat .hd span{font-size:11.5px;color:var(--ink3)}
+  .msgs{padding:16px;overflow-y:auto;flex:1;min-height:120px}
+  .empty{color:var(--ink3);font-size:13px;padding:6px 2px 2px}
+  .empty code{font-family:var(--mono);font-size:11.5px;background:var(--sunk);
+    padding:2px 6px;border-radius:4px;color:var(--ink2)}
+  .msg{display:flex;gap:9px;margin-bottom:14px;animation:rise .3s both}
+  @keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .msg .who{width:22px;height:22px;border-radius:5px;flex:none;display:grid;
+    place-items:center;font-size:10px;font-weight:650;margin-top:1px}
+  .msg.user .who{background:var(--sunk);color:var(--ink2);border:1px solid var(--line)}
+  .msg.bot .who{background:var(--ink);color:#fff}
+  .msg .bub{font-size:13.5px;color:var(--ink2);min-width:0}
   .msg.user .bub{color:var(--ink);font-weight:500}
-  .msg .bub b{color:var(--ink);font-weight:640}
-  .msg.act .bub{color:var(--ink3);font-size:13.5px}
-  .tick{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
-    font-size:11.5px;color:var(--ink3);background:var(--sunk);border-radius:7px;
-    padding:3px 8px;margin-top:6px}
-  .compose{border-top:1px solid var(--line);padding:14px 18px;background:var(--sunk)}
-  .compose .row{display:flex;gap:9px}
-  input,button{font-family:inherit}
+  .msg .bub b{color:var(--ink);font-weight:600}
+  .tick{display:inline-block;font-family:var(--mono);font-size:11px;
+    color:var(--ink3);background:var(--sunk);border-radius:5px;padding:2px 7px;
+    margin-top:5px}
+  .compose{border-top:1px solid var(--line);padding:12px 14px}
+  .compose .row{display:flex;gap:8px}
   .compose input{flex:1;border:1px solid var(--line2);background:var(--card);
-    border-radius:10px;padding:11px 13px;font-size:13.5px;color:var(--ink);outline:none}
-  .compose input:focus{border-color:var(--brand);box-shadow:0 0 0 3px #4338ca1f}
-  .mini{border:1px solid var(--line2);background:var(--card);color:var(--ink2);
-    border-radius:9px;padding:0 13px;font-size:13px;font-weight:560;cursor:pointer}
-  .mini:hover{border-color:var(--brand);color:var(--brand)}
-  .hintrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .hint{border:1px solid var(--line2);background:var(--card);border-radius:8px;
-    padding:4px 9px;font-size:11.5px;color:var(--ink3);cursor:pointer;font-family:var(--mono)}
-  .hint:hover{border-color:var(--brand);color:var(--brand)}
+    border-radius:8px;padding:10px 12px;font-size:13.5px;color:var(--ink);
+    outline:none;font-family:inherit}
+  .compose input:focus{border-color:var(--ink2)}
+  .send{border:0;background:var(--ink);color:#fff;border-radius:8px;
+    padding:0 16px;font-size:13px;font-weight:550}
+  .send:disabled{opacity:.4;cursor:default}
+  .sugg{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+  .sg-chip{border:1px solid var(--line);background:var(--card);color:var(--ink3);
+    border-radius:6px;padding:4px 9px;font-size:11.5px}
+  .sg-chip:hover{border-color:var(--ink3);color:var(--ink)}
 
-  /* ---------- right: canvas ---------- */
-  .canvas{min-height:60vh}
-  .intro{background:var(--card);border:1px solid var(--line);border-radius:18px;
-    padding:36px 34px;box-shadow:var(--sh-1)}
-  .eyebrow{font-size:12px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--brand);margin-bottom:12px}
-  h1{margin:0 0 12px;font-size:31px;line-height:1.15;letter-spacing:-.7px;font-weight:700}
-  .intro p{margin:0;color:var(--ink2);font-size:15.5px;max-width:600px}
-  .cta{margin-top:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .primary{background:var(--ink);color:#fff;border:0;border-radius:11px;
-    padding:13px 22px;font-size:14.5px;font-weight:620;cursor:pointer;
-    box-shadow:var(--sh-2);transition:.15s}
-  .primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--sh-3)}
-  .primary:disabled{opacity:.4;cursor:default;box-shadow:none;transform:none}
-  .cta .note{font-size:13px;color:var(--ink3)}
+  /* ---- canvas ---- */
+  .canvas{min-height:50vh}
+  .intro{padding:26px 4px 8px}
+  h1{margin:0 0 10px;font-size:26px;line-height:1.2;letter-spacing:-.4px;font-weight:650}
+  .intro p{margin:0 0 4px;color:var(--ink2);font-size:14.5px;max-width:560px}
+  .intro .fine{color:var(--ink3);font-size:12.5px}
 
-  h2{margin:0 0 5px;font-size:19px;letter-spacing:-.3px;font-weight:670}
-  .sub{color:var(--ink3);font-size:13.5px;margin:0 0 16px}
-  .block{margin-top:24px;animation:rise .38s both}
+  h2{margin:0;font-size:15px;font-weight:600}
+  .sub{color:var(--ink3);font-size:12.5px;margin:3px 0 0}
+  .sect-hd{display:flex;align-items:baseline;justify-content:space-between;
+    margin:26px 0 12px;gap:12px;flex-wrap:wrap}
+  .block{animation:rise .35s both}
 
   /* offers */
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:16px}
-  .prod{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    overflow:hidden;box-shadow:var(--sh-1);transition:.22s;position:relative}
-  .prod.sel{border-color:var(--brand);box-shadow:0 0 0 3px #4338ca1f,var(--sh-2)}
-  .prod.out{opacity:.5}
-  .prod.killed{border-color:#F3C6D2;background:#FFFBFC}
-  .shot{height:185px;background:#fff;
-    display:grid;place-items:center;border-bottom:1px solid var(--line);
-    overflow:hidden}
-  .shot svg{width:96px;height:96px}
-  .pb{padding:15px 16px 17px}
-  .store{font-size:11.5px;color:var(--ink3);font-family:var(--mono);margin-bottom:5px}
-  .pname{font-weight:620;font-size:14.5px;margin-bottom:9px;letter-spacing:-.1px}
-  .cost{display:flex;align-items:baseline;gap:8px}
-  .cost b{font-size:23px;font-weight:730;letter-spacing:-.8px}
-  .cost s{color:var(--ink3);font-size:13px}
-  .meta{margin-top:9px;font-size:12.5px;color:var(--ink3)}
-  .tag{position:absolute;top:12px;left:12px;font-size:11px;font-weight:650;
-    border-radius:999px;padding:4px 10px;letter-spacing:.01em}
-  .t-cheap{background:var(--brand);color:#fff}
-  .t-out{background:#E8EAF0;color:var(--ink2)}
-  .t-kill{background:var(--danger);color:#fff}
-  .t-ok{background:var(--safe);color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
+  .prod{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;position:relative;transition:border-color .2s,opacity .2s}
+  .prod.sel{border-color:var(--ink)}
+  .prod.out{opacity:.45}
+  .prod.killed{border-color:var(--danger-line);background:#FFFDFD}
+  .shot{height:160px;background:#fff;border-bottom:1px solid var(--line);
+    display:grid;place-items:center;overflow:hidden}
+  .shot img{width:100%;height:100%;object-fit:contain;padding:8px}
+  .shot svg{width:80px;height:80px}
+  .pb{padding:12px 14px 14px}
+  .store{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-bottom:3px}
+  .pname{font-weight:570;font-size:13.5px;margin-bottom:8px}
+  .cost{display:flex;align-items:baseline;gap:7px}
+  .cost b{font-size:19px;font-weight:650;letter-spacing:-.4px}
+  .cost s{color:var(--ink3);font-size:12px;font-weight:400}
+  .meta2{margin-top:7px;font-size:12px;color:var(--ink3);display:flex;gap:10px}
+  .lbl{position:absolute;top:10px;left:10px;font-size:10.5px;font-weight:600;
+    padding:3px 8px;border-radius:4px;letter-spacing:.02em;background:var(--card);
+    border:1px solid var(--line2);color:var(--ink2)}
+  .lbl.pick{background:var(--ink);border-color:var(--ink);color:#fff}
+  .lbl.bad{background:var(--danger);border-color:var(--danger);color:#fff}
+  .lbl.good{background:var(--safe);border-color:var(--safe);color:#fff}
 
   /* checkout */
-  .co{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    box-shadow:var(--sh-2);overflow:hidden;margin-bottom:16px}
+  .co{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;margin-bottom:14px}
   .co .ch{display:flex;justify-content:space-between;align-items:center;
-    padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px}
-  .co .ch b{font-size:15px;font-weight:640}
-  .co .ch span{font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
-  .lines{padding:14px 20px}
-  .li{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink2);
-    padding:5px 0}
-  .li.total{border-top:1px solid var(--line);margin-top:7px;padding-top:11px;
-    font-weight:650;color:var(--ink);font-size:15px}
-  .dest{margin:14px 20px;background:var(--sunk);border:1px solid var(--line);
-    border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;
-    color:var(--ink2);word-break:break-all}
-  .dest u{display:block;color:var(--ink3);text-decoration:none;font-size:10.5px;
-    letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px}
+    padding:13px 18px;border-bottom:1px solid var(--line);gap:8px;flex-wrap:wrap}
+  .co .ch b{font-size:13.5px;font-weight:600}
+  .co .ch span{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+  .lines{padding:10px 18px 4px}
+  .li{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);
+    padding:4px 0}
+  .li.total{border-top:1px solid var(--line);margin-top:6px;padding:9px 0 10px;
+    font-weight:600;color:var(--ink);font-size:14px}
+  .dest{margin:0 18px 12px;background:var(--sunk);border-radius:7px;
+    padding:9px 12px;font-family:var(--mono);font-size:11px;color:var(--ink2);
+    word-break:break-all}
+  .dest u{text-decoration:none;color:var(--ink3);font-size:10px;
+    letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:3px}
 
-  .gd{margin:0 20px 20px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .gd .gh{background:var(--sunk);padding:10px 14px;display:flex;align-items:center;
-    gap:9px;font-size:13px;font-weight:600;border-bottom:1px solid var(--line)}
-  .gd .gh .sh{width:20px;height:20px;border-radius:6px;background:var(--brand-soft);
-    color:var(--brand);display:grid;place-items:center;font-size:11px}
-  .gd .gh .rt{margin-left:auto;font-family:var(--mono);font-size:11px;
+  .gd{margin:0 18px 16px;border:1px solid var(--line);border-radius:8px;
+    overflow:hidden}
+  .gd .gh{background:var(--sunk);padding:9px 13px;display:flex;align-items:center;
+    gap:8px;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--line)}
+  .gd .gh svg{width:14px;height:14px;stroke:var(--ink2)}
+  .gd .gh .rt{margin-left:auto;font-family:var(--mono);font-size:10.5px;
     color:var(--ink3);font-weight:400}
-  .gbody{padding:12px 14px}
-  .sg{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;
+  .gbody{padding:8px 13px 12px}
+  .sg{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;
     border-bottom:1px solid var(--line);animation:rise .3s both}
-  .sg:last-child{border-bottom:0}
+  .sg:last-of-type{border-bottom:0}
   .sg .n{flex:1;color:var(--ink2)}
-  .sg .n em{font-style:normal;color:var(--ink3);font-size:11.5px;font-family:var(--mono)}
-  .sg .v{font-family:var(--mono);font-weight:600;font-size:13px}
+  .sg .n em{font-style:normal;color:var(--ink3);font-size:11px;font-family:var(--mono);
+    margin-left:6px}
+  .sg .v{font-family:var(--mono);font-size:12px;font-weight:600}
   .sg a{font-family:var(--mono);font-size:10.5px}
-  .bar{height:7px;background:var(--sunk);border-radius:5px;margin:13px 0 6px;
-    overflow:hidden;border:1px solid var(--line)}
-  .bar i{display:block;height:100%;width:0;transition:width .85s cubic-bezier(.2,.7,.3,1)}
-  .sc{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;
-    color:var(--ink3)}
-  .vd{margin-top:14px;border-radius:11px;padding:13px 15px;font-weight:640;font-size:14.5px;
-    animation:rise .35s both}
-  .vd small{display:block;font-weight:450;font-size:12px;margin-top:4px;
+  .bar{height:4px;background:var(--sunk);border-radius:3px;margin:11px 0 5px;
+    overflow:hidden}
+  .bar i{display:block;height:100%;width:0;transition:width .8s ease;border-radius:3px}
+  .sc{display:flex;justify-content:space-between;font-family:var(--mono);
+    font-size:10px;color:var(--ink3)}
+  .vd{margin-top:12px;border-radius:7px;padding:11px 13px;font-weight:600;
+    font-size:13px;animation:rise .35s both;border:1px solid}
+  .vd small{display:block;font-weight:400;font-size:11px;margin-top:3px;
     font-family:var(--mono);opacity:.9}
-  .vd.block{background:var(--danger-soft);color:var(--danger);border:1px solid #F6CBD8}
-  .vd.allow{background:var(--safe-soft);color:var(--safe);border:1px solid #BFE5D6}
-  .vd.review{background:var(--warn-soft);color:var(--warn);border:1px solid #F2DDB6}
+  .vd.block{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-line)}
+  .vd.allow{background:var(--safe-bg);color:var(--safe);border-color:var(--safe-line)}
+  .vd.review{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-line)}
 
-  .done{background:linear-gradient(160deg,#F0FBF6,#FFFFFF);border:1px solid #BFE5D6;
-    border-radius:16px;padding:22px 24px;box-shadow:var(--sh-1);animation:rise .4s both}
-  .done .t{font-size:17px;font-weight:700;color:var(--safe);margin-bottom:4px;
-    letter-spacing:-.3px}
-  .done .s{font-size:13.5px;color:var(--ink2)}
+  .done{background:var(--safe-bg);border:1px solid var(--safe-line);
+    border-radius:10px;padding:16px 18px;animation:rise .4s both}
+  .done .t{font-size:14px;font-weight:650;color:var(--safe);margin-bottom:3px}
+  .done .s{font-size:12.5px;color:var(--ink2)}
 
-  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line2);
-    border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite}
+  .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line2);
+    border-top-color:var(--ink2);border-radius:50%;animation:sp .7s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  .snip{background:var(--ink);color:#D9DEE8;border-radius:14px;padding:18px 20px;
-    font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto;
-    white-space:pre;margin-top:12px;box-shadow:var(--sh-2)}
-  .snip .k{color:#C4B5FD} .snip .s{color:#86EFAC}
-  footer{max-width:1240px;margin:0 auto;padding:10px 26px 64px;color:var(--ink3);
-    font-size:12.5px;line-height:1.75}
-  footer b{color:var(--ink2)}
+  .snip{background:#1B1A19;color:#D6D3CE;border-radius:8px;padding:15px 17px;
+    font-family:var(--mono);font-size:12px;line-height:1.65;overflow-x:auto;
+    white-space:pre}
+  .snip .k{color:#A5B4FC} .snip .s{color:#86EFAC}
+  footer{max-width:1200px;margin:0 auto;padding:16px 24px 56px;color:var(--ink3);
+    font-size:12px;line-height:1.7}
+  footer b{color:var(--ink2);font-weight:550}
 </style>
 </head>
 <body>
 
 <div class="top"><div class="in">
-  <div class="brand"><span class="mk">◆</span> Vessel <small>agent checkout</small></div>
+  <div class="logo"><span class="mk">V</span> Vessel <small>agent checkout</small></div>
   <div class="sp"></div>
-  <a class="badge" id="wallet" href="#" target="_blank" rel="noopener"
-     style="text-decoration:none" title="the agent's wallet on Base Sepolia — every screening is paid from here">
-    <span class="lamp" style="background:var(--brand);box-shadow:0 0 0 3px #4338ca22"></span>
-    <span id="wtext">wallet…</span></a>
-  <span class="badge"><span class="lamp"></span><span id="mcount">connecting…</span></span>
-  <span class="badge">guarded by TelegraphGuard</span>
+  <div class="meta">
+    <a id="wallet" href="#" target="_blank" rel="noopener" title="the agent's wallet — every screening is paid from here"><span id="wtext">wallet…</span></a>
+    <span><span class="dot"></span><span id="mcount">connecting…</span></span>
+    <span>guard <b>TelegraphGuard</b></span>
+  </div>
 </div></div>
 
 <div class="shell">
 
-  <!-- LEFT: agent conversation -->
-  <div class="thread">
+  <div class="chat">
     <div class="hd">
-      <div class="av">◆</div>
-      <div><b>Vessel</b><span>shopping agent · wallet enabled</span></div>
+      <div class="av">V</div>
+      <div><b>Vessel</b><span>shopping agent · pays in USDC from its own wallet</span></div>
     </div>
     <div class="msgs" id="msgs">
-      <div class="msg user"><div class="who">P</div>
-        <div class="bub">Buy me a <b>4K webcam</b> for the home office — under <b>$150</b>,
-          delivered this week.</div></div>
-      <div class="msg bot"><div class="who">◆</div>
-        <div class="bub">On it. I'll compare merchants that accept agent payment and settle
-          in USDC.<span class="tick">budget ≤ $150 · 4K/60 · ships ≤ 3 days</span></div></div>
+      <div class="empty">Tell it what to buy, or paste an address / URL to screen.<br>
+        Try: <code id="tryTask" style="cursor:pointer">Buy me a 4K webcam for the home office — under $150, delivered this week.</code></div>
     </div>
     <div class="compose">
       <div class="row">
-        <input id="q" spellcheck="false" placeholder="screen any address or URL…">
-        <button class="mini" id="goBtn">Check</button>
+        <input id="q" spellcheck="false" autocomplete="off"
+               placeholder="Buy me a 4K webcam under $150…">
+        <button class="send" id="goBtn">Send</button>
       </div>
-      <div class="hintrow" id="hints"></div>
+      <div class="sugg" id="sugg"></div>
     </div>
   </div>
 
-  <!-- RIGHT: canvas -->
   <div class="canvas" id="canvas">
     <div class="intro" id="intro">
-      <div class="eyebrow">Agentic commerce · live demo</div>
       <h1>Your agent is about to spend your money.<br>Who checks where it goes?</h1>
-      <p>Allowlists and spend limits are rules you wrote in advance. They can't tell you
-         whether a storefront you've never seen is real. TelegraphGuard screens the
-         destination across live Telegraph miners before the wallet signs anything.</p>
-      <div class="cta">
-        <button class="primary" id="run">Let the agent shop</button>
-        <span class="note">makes real paid calls · about 15 seconds</span>
-      </div>
+      <p>Vessel shops on its own and pays from its own wallet. Before it signs anything,
+         TelegraphGuard screens the destination across live Telegraph miners — and every
+         verdict carries an on-chain receipt.</p>
+      <p class="fine">Type a task on the left to start. Screenings are real paid calls
+         (~$0.01 each); the storefronts are fictional, their payment destinations are not.</p>
     </div>
   </div>
 
@@ -256,214 +233,244 @@
 
 <footer>
   Testnet only (Base Sepolia). Every verdict is a live paid screening over x402 — no demo
-  mode, no cached inference — and every signal links to an on-chain receipt.
-  The storefronts are fictional; their destinations are <b>real</b> — the flagged merchant
-  settles to an OFAC-sanctioned Tornado Cash address, the trusted one to a mainnet router —
-  so the miners are genuinely tested rather than told what to say.
-  On a 39-target labelled corpus this scored <b>37 correct</b>, missing one sanctioned
-  address and false-positiving one router; both were miner coverage gaps, not aggregation
-  errors.
+  mode, no cached inference. The flagged storefront settles to an <b>OFAC-sanctioned
+  Tornado Cash address</b>; the trusted one to a well-known mainnet router — real targets,
+  so the miners are genuinely tested rather than told what to say. On a 39-target labelled
+  corpus this scored <b>37 correct</b>; the two misses were miner coverage gaps, published
+  in the repo rather than hidden.
 </footer>
 
 <script>
-const CAM = `<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="60" cy="104" rx="30" ry="5" fill="#0B0D12" opacity=".07"/>
-  <rect x="22" y="34" width="66" height="46" rx="13" fill="#252C3A"/>
-  <rect x="26" y="38" width="58" height="38" rx="10" fill="#161C27"/>
-  <circle cx="55" cy="57" r="17" fill="#0B0D12"/>
-  <circle cx="55" cy="57" r="12" fill="#1E2A45"/>
-  <circle cx="55" cy="57" r="6.5" fill="#3B5BDB"/>
-  <circle cx="50.5" cy="52.5" r="2.6" fill="#fff" opacity=".92"/>
-  <rect x="76" y="50" width="5" height="5" rx="2.5" fill="#22C55E"/>
-  <path d="M88 48l18-11v46l-18-11z" fill="#2F374A"/>
-  <rect x="40" y="80" width="30" height="4" rx="2" fill="#39404F"/>
-  <path d="M45 84h20l7 14H38z" fill="#2A3040"/>
-</svg>`;
+const CAM_FALLBACK = `<svg viewBox="0 0 120 120" fill="none">
+  <rect x="24" y="34" width="62" height="44" rx="12" fill="#2A2725"/>
+  <circle cx="55" cy="56" r="15" fill="#191817"/><circle cx="55" cy="56" r="8" fill="#3B3835"/>
+  <circle cx="51.5" cy="52.5" r="2.4" fill="#fff" opacity=".8"/>
+  <path d="M86 48l16-10v40l-16-10z" fill="#3B3835"/>
+  <path d="M45 82h20l6 12H39z" fill="#2A2725"/></svg>`;
+const SHIELD = `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+  <path d="M12 3l7 2.6v5.8c0 4.6-3 8-7 9.6-4-1.6-7-5-7-9.6V5.6L12 3z"/>
+  <path d="M9.2 12l2 2 3.6-4"/></svg>`;
 
 const MERCH = [
-  {id:'px', store:'105.186.81.49', name:'PixelHaus Direct', price:89, was:159, ship:'2 days',
-   pay:'0x722122dF12D4e14e13Ac3b6895a86e84145b6967'},
-  {id:'ng', store:'northgear.example', name:'NorthGear Supply', price:139, was:159, ship:'3 days',
-   pay:'0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'},
-  {id:'at', store:'atlas.example', name:'Atlas Peripherals', price:152, was:null, ship:'5 days',
-   pay:null},
+  {id:'px', store:'105.186.81.49', name:'PixelHaus Direct', price:89, was:159,
+   ship:2, pay:'0x722122dF12D4e14e13Ac3b6895a86e84145b6967'},
+  {id:'ng', store:'northgear.example', name:'NorthGear Supply', price:139, was:159,
+   ship:3, pay:'0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'},
+  {id:'at', store:'atlas.example', name:'Atlas Peripherals', price:152, was:null,
+   ship:5, pay:null},
 ];
+const DEFAULT_TASK = 'Buy me a 4K webcam for the home office — under $150, delivered this week.';
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
-function say(html, cls='bot', who='◆'){
+function say(html, cls='bot'){
+  const empty=$('.empty'); if(empty) empty.remove();
   const d=document.createElement('div');
-  d.className='msg auto '+cls;
-  d.innerHTML=`<div class="who">${who}</div><div class="bub">${html}</div>`;
+  d.className='msg '+cls;
+  d.innerHTML=`<div class="who">${cls==='user'?'P':'V'}</div><div class="bub">${html}</div>`;
   $('#msgs').appendChild(d);
-  $('#msgs').scrollTop = $('#msgs').scrollHeight;
+  $('#msgs').scrollTop=$('#msgs').scrollHeight;
   return d;
 }
-function add(html){ const d=document.createElement('div'); d.className='block';
-  d.innerHTML=html; $('#canvas').appendChild(d); return d; }
+function add(html){const d=document.createElement('div');d.className='block';
+  d.innerHTML=html;$('#canvas').appendChild(d);return d;}
 
 const screen = t => fetch('/api/screen',{method:'POST',
   headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t})})
-  .then(r=>r.json())
-  // A screening just spent from the wallet — update the header balance.
-  .then(d=>{ try{ refreshStatus(); }catch(e){} return d; });
+  .then(r=>r.json()).then(d=>{try{refreshStatus();}catch(e){} return d;});
 
-function card(m,cls,tag){
-  // Real product photography if scripts/gen_images.py has run; SVG otherwise.
-  const shot = `<img src="/img/cam-${m.id}.png" alt="" loading="lazy"
-    style="width:100%;height:100%;object-fit:contain;padding:10px"
-    onerror="this.outerHTML=CAM">`;
-  return `<div class="prod ${cls}" id="p-${m.id}">
-    ${tag||''}
-    <div class="shot">${shot}</div>
+const isScreenable = t =>
+  /^0x[0-9a-fA-F]{40}$/.test(t) || /^0x[0-9a-fA-F]{64}$/.test(t) ||
+  /\.eth$/i.test(t) || /^https?:\/\//i.test(t) ||
+  (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(t) && !/\s/.test(t));
+
+/* ---------- shopping flow ---------- */
+
+function parseBudget(text){
+  const m = text.match(/(?:under|below|less than|max|budget of|≤|<)\s*\$?\s*(\d+)/i)
+         || text.match(/\$\s*(\d+)/);
+  return m ? parseInt(m[1],10) : null;
+}
+
+function card(m){
+  return `<div class="prod" id="p-${m.id}">
+    <div class="shot"><img src="/img/cam-${m.id}.png" alt=""
+      onerror="this.outerHTML=CAM_FALLBACK"></div>
     <div class="pb">
       <div class="store">${esc(m.store)}</div>
-      <div class="pname">${esc(m.name)}</div>
+      <div class="pname">${esc(m.name)} · 4K webcam</div>
       <div class="cost"><b>$${m.price}</b>${m.was?`<s>$${m.was}</s>`:''}</div>
-      <div class="meta">${esc(m.ship)} delivery</div>
+      <div class="meta2"><span>${m.ship}-day delivery</span><span>in stock</span></div>
     </div></div>`;
+}
+function label(id, text, cls=''){
+  const el=$('#p-'+id); if(!el) return;
+  const old=el.querySelector('.lbl'); if(old) old.remove();
+  el.insertAdjacentHTML('afterbegin',`<span class="lbl ${cls}">${text}</span>`);
 }
 
 function sgRows(d){
   return d.signals.filter(s=>!s.error).map(s=>{
-    const r = s.risk===null?'—':s.risk.toFixed(2);
-    const col = s.risk===null?'var(--ink3)':s.risk>=.7?'var(--danger)':s.risk<.3?'var(--safe)':'var(--warn)';
-    const a = s.verify_url?`<a href="${esc(s.verify_url)}" target="_blank" rel="noopener">verify ↗</a>`:'';
+    const r=s.risk===null?'—':s.risk.toFixed(2);
+    const col=s.risk===null?'var(--ink3)':s.risk>=.7?'var(--danger)':s.risk<.3?'var(--safe)':'var(--warn)';
+    const a=s.verify_url?`<a href="${esc(s.verify_url)}" target="_blank" rel="noopener">receipt</a>`:'';
     return `<div class="sg"><span class="n">${esc(s.miner_name||s.miner_id||'?')}
       <em>${esc(s.intent.split('_')[0].toLowerCase())}</em></span>
       <span class="v" style="color:${col}">${r}</span>${a}</div>`;
   }).join('');
 }
 
-async function checkout(m, attempt){
-  const el = add(`<div class="co">
-    <div class="ch"><b>${esc(m.name)}</b><span>${esc(attempt)}</span></div>
+async function checkout(m, attempt, amount){
+  const el=add(`<div class="co">
+    <div class="ch"><b>${esc(m.name)}</b><span>attempt ${attempt}</span></div>
     <div class="lines">
-      <div class="li"><span>4K webcam · 60fps</span><span>$${m.price}.00</span></div>
+      <div class="li"><span>4K webcam · 60fps</span><span>$${amount}.00</span></div>
       <div class="li"><span>Shipping</span><span>$0.00</span></div>
-      <div class="li total"><span>Total in USDC</span><span>$${m.price}.00</span></div>
+      <div class="li total"><span>Total in USDC</span><span>$${amount}.00</span></div>
     </div>
     <div class="dest"><u>settles to</u>${esc(m.pay)}</div>
-    <div class="gd"><div class="gh"><span class="sh">⛨</span> TelegraphGuard
-      <span class="rt" id="rt-${m.id}"><span class="spin"></span></span></div>
-      <div class="gbody" id="g-${m.id}"></div></div></div>`);
+    <div class="gd"><div class="gh">${SHIELD} TelegraphGuard
+      <span class="rt" id="rt-${m.id}-${attempt}"><span class="spin"></span> screening</span></div>
+      <div class="gbody" id="g-${m.id}-${attempt}"></div></div></div>`);
   el.scrollIntoView({block:'center',behavior:'smooth'});
 
-  const d = await screen(m.pay);
-  $('#rt-'+m.id).innerHTML = d.error?'':`${d.elapsed_ms} ms · $${d.cost_usd.toFixed(4)}`;
-  const g = $('#g-'+m.id);
+  const d=await screen(m.pay);
+  const rt=$(`#rt-${m.id}-${attempt}`), g=$(`#g-${m.id}-${attempt}`);
+  rt.innerHTML=d.error?'':`${d.elapsed_ms} ms · $${d.cost_usd.toFixed(4)}`;
 
-  if(d.error || !d.evidence){
-    g.innerHTML = `<div class="vd review">Inconclusive — the agent will not proceed
-      <small>${esc(d.error||'no miner evidence returned')}</small></div>`;
+  if(d.error||!d.evidence){
+    g.innerHTML=`<div class="vd review">Couldn't verify this destination — holding the payment
+      <small>${esc(d.error||'no miner evidence returned; the agent does not proceed')}</small></div>`;
     return 'review';
   }
-  const col = d.verdict==='allow'?'var(--safe)':d.verdict==='block'?'var(--danger)':'var(--warn)';
-  const head = d.verdict==='block' ? 'Payment blocked — funds never left the wallet'
-    : d.verdict==='allow' ? 'Destination clear — agent authorised to pay'
-    : 'Held for human approval';
-  g.innerHTML = sgRows(d) +
+  const col=d.verdict==='allow'?'var(--safe)':d.verdict==='block'?'var(--danger)':'var(--warn)';
+  const head=d.verdict==='block'?'Payment blocked — funds never left the wallet'
+    :d.verdict==='allow'?'Destination clear — agent authorised to pay'
+    :'Held for human approval — not enough evidence to pay';
+  g.innerHTML=sgRows(d)+
     `<div class="bar"><i style="background:${col}"></i></div>
      <div class="sc"><span>0.00 safe</span><span>risk ${d.risk.toFixed(2)} · block ≥ 0.70</span>
       <span>1.00 fraud</span></div>
      <div class="vd ${d.verdict}">${head}<small>${esc(d.reasons[0]||'')}</small></div>`;
-  requestAnimationFrame(()=>{const i=g.querySelector('.bar i'); if(i) i.style.width=(d.risk*100)+'%';});
+  requestAnimationFrame(()=>{const i=g.querySelector('.bar i');if(i)i.style.width=(d.risk*100)+'%';});
   return d.verdict;
 }
 
 let busy=false;
-async function run(){
-  if(busy) return; busy=true;
+async function startTask(text){
+  if(busy) return; busy=true; $('#goBtn').disabled=true;
   const intro=$('#intro'); if(intro) intro.style.display='none';
   document.querySelectorAll('.block').forEach(b=>b.remove());
-  document.querySelectorAll('.msg.auto').forEach(m=>m.remove());
 
-  say('Searching merchants that accept agent payment…'); await wait(800);
-  say('Found <b>3 offers</b>. Comparing price, delivery and stock.'); await wait(400);
-
-  const off = add(`<h2>Offers</h2><p class="sub">A product feed tells the agent price and
-    delivery. It says nothing about whether the storefront is real.</p>
-    <div class="grid">${MERCH.map(m=>card(m,'')).join('')}</div>`);
-  off.scrollIntoView({block:'start',behavior:'smooth'});
+  say(esc(text),'user');
+  const budget=parseBudget(text)??150;
+  say(`On it. Reading that as: <b>4K webcam</b>, budget <b>$${budget}</b>, fast delivery.
+    I'll pay in USDC from my wallet.<span class="tick">screening every destination before paying</span>`);
   await wait(700);
 
-  $('#p-at').classList.add('out');
-  $('#p-at').insertAdjacentHTML('afterbegin','<span class="tag t-out">over budget</span>');
-  say('Atlas is $152 — over budget, dropping it.','bot'); await wait(600);
+  const inBudget = MERCH.filter(m=>m.price<=budget);
+  add(`<div class="sect-hd"><div><h2>Offers</h2>
+    <div class="sub">A product feed gives the agent price and delivery — nothing about
+    whether the storefront is real.</div></div></div>
+    <div class="grid">${MERCH.map(card).join('')}</div>`)
+    .scrollIntoView({block:'start',behavior:'smooth'});
+  await wait(700);
 
-  $('#p-px').classList.add('sel');
-  $('#p-px').insertAdjacentHTML('afterbegin','<span class="tag t-cheap">cheapest</span>');
-  say('<b>PixelHaus</b> at <b>$89</b> is the best price. Proceeding to checkout.'); await wait(500);
+  for(const m of MERCH) if(m.price>budget){
+    $('#p-'+m.id).classList.add('out'); label(m.id,'over budget');
+  }
+  const dropped=MERCH.filter(m=>m.price>budget).map(m=>m.name);
+  if(dropped.length) say(`${esc(dropped.join(' and '))} ${dropped.length>1?'are':'is'} over
+    the $${budget} budget — dropping ${dropped.length>1?'them':'it'}.`);
+  await wait(500);
 
-  add(`<h2>Checkout</h2><p class="sub">Before the wallet signs, the destination is screened
-    across live Telegraph miners.</p>`);
-  say('Screening the settlement address before I pay…');
-
-  const v1 = await checkout(MERCH[0],'attempt 1');
-
-  if(v1==='allow'){
-    say('Screening found nothing. Paid <b>PixelHaus</b>.','bot');
-    add(`<div class="done"><div class="t">Order placed · PixelHaus Direct</div>
-      <div class="s">$89.00 USDC settled.</div></div>`);
-  } else {
-    $('#p-px').classList.remove('sel'); $('#p-px').classList.add('killed');
-    const t=$('#p-px .tag'); t.className='tag t-kill'; t.textContent='blocked';
-    say('That address is <b>flagged</b>. I did not pay — falling back to the next offer in budget.','bot');
-    await wait(650);
-    $('#p-ng').classList.add('sel');
-    $('#p-ng').insertAdjacentHTML('afterbegin','<span class="tag t-ok">selected</span>');
-    const v2 = await checkout(MERCH[1],'attempt 2');
-    if(v2==='allow'){
-      say('Clear. Paid <b>NorthGear</b> $139.00 — arrives in 3 days.','bot');
-      add(`<div class="done"><div class="t">Order placed · NorthGear Supply</div>
-        <div class="s">$139.00 USDC settled · 4K webcam · arrives in 3 days ·
-        destination screened against live Telegraph miners.</div></div>`);
-    } else { say('No merchant cleared screening. Escalating to you before spending anything.','bot'); }
+  if(!inBudget.length){
+    say(`Nothing fits under $${budget}. Cheapest offer is $${Math.min(...MERCH.map(m=>m.price))} —
+      want me to raise the budget?`);
+    busy=false; $('#goBtn').disabled=false; return;
   }
 
-  add(`<h2>Add it to your own agent</h2><p class="sub">One node between intent and wallet.</p>
+  const queue=[...inBudget].sort((a,b)=>a.price-b.price).filter(m=>m.pay);
+  add(`<div class="sect-hd"><div><h2>Checkout</h2>
+    <div class="sub">Before the wallet signs, TelegraphGuard screens the destination
+    across live Telegraph miners.</div></div></div>`);
+
+  let paid=null, attempt=0;
+  for(const m of queue){
+    attempt++;
+    if(attempt===1){ $('#p-'+m.id).classList.add('sel'); label(m.id,'best price','pick'); }
+    else { $('#p-'+m.id).classList.add('sel'); label(m.id,'fallback','pick'); }
+    say(`${attempt===1?'':'Falling back. '}<b>${esc(m.name)}</b> at <b>$${m.price}</b> —
+      screening its settlement address before I pay…`);
+    const v=await checkout(m, attempt, m.price);
+    if(v==='allow'){ paid=m; label(m.id,'purchased','good'); break; }
+    $('#p-'+m.id).classList.remove('sel'); $('#p-'+m.id).classList.add('killed');
+    label(m.id, v==='block'?'blocked':'unverified', v==='block'?'bad':'');
+    say(v==='block'
+      ?`That address is <b>flagged</b> by the miners. I did not pay.`
+      :`I <b>couldn't verify</b> that address — holding rather than guessing. I did not pay.`);
+    await wait(500);
+  }
+
+  if(paid){
+    say(`Done — paid <b>${esc(paid.name)}</b> $${paid.price}.00. Arrives in ${paid.ship} days.`);
+    add(`<div class="done"><div class="t">Order placed — ${esc(paid.name)}</div>
+      <div class="s">$${paid.price}.00 USDC · 4K webcam · ${paid.ship}-day delivery ·
+      destination screened against live Telegraph miners</div></div>`);
+  } else {
+    say(`No merchant in budget cleared screening. I haven't spent anything —
+      escalating to you.`);
+  }
+
+  add(`<div class="sect-hd"><div><h2>Add it to your own agent</h2>
+    <div class="sub">One node between intent and wallet.</div></div></div>
     <div class="snip"><span class="k">from</span> telegraph_guard.langgraph <span class="k">import</span> guard_node, route_on_verdict
 
 g.add_node(<span class="s">"guard"</span>, guard_node())
 g.add_conditional_edges(<span class="s">"guard"</span>, route_on_verdict,
-    {<span class="s">"execute"</span>: <span class="s">"pay"</span>, <span class="s">"abort"</span>: END, <span class="s">"human"</span>: <span class="s">"hitl"</span>})</div>
-    <div class="cta" style="margin-top:18px">
-      <button class="primary" onclick="run()">Run it again</button>
-      <span class="note">each run makes fresh paid calls to live miners</span>
-    </div>`);
+    {<span class="s">"execute"</span>: <span class="s">"pay"</span>, <span class="s">"abort"</span>: END, <span class="s">"human"</span>: <span class="s">"hitl"</span>})</div>`);
 
-  busy=false;
+  busy=false; $('#goBtn').disabled=false;
 }
-$('#run').onclick=run;
 
-/* free-form screening from the composer */
-const EX=[['Uniswap router','0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'],
-  ['Tornado Cash','0x722122dF12D4e14e13Ac3b6895a86e84145b6967'],
-  ['Bybit exploiter','0x47666Fab8bd0Ac7003bce3f5C3585383F09486E2'],
-  ['malware URL','http://105.186.81.49:43127/bin.sh']];
-$('#hints').innerHTML = EX.map(([l,v])=>`<button class="hint" data-v="${esc(v)}">${esc(l)}</button>`).join('');
-document.querySelectorAll('.hint').forEach(b=>b.onclick=()=>{$('#q').value=b.dataset.v; ask();});
-
-async function ask(){
-  const t=$('#q').value.trim(); if(!t||busy) return;
-  busy=true; $('#goBtn').disabled=true;
-  say(esc(t),'user','P');
-  const m = say('<span class="spin"></span> screening across live miners…');
-  const d = await screen(t);
+/* ---------- screening from chat ---------- */
+async function screenChat(t){
+  if(busy) return; busy=true; $('#goBtn').disabled=true;
+  say(esc(t),'user');
+  const m=say('<span class="spin"></span> screening across live miners…');
+  const d=await screen(t);
   m.remove();
   if(d.error){ say(`Couldn't screen that — ${esc(d.error)}`); }
   else{
     const col=d.verdict==='allow'?'var(--safe)':d.verdict==='block'?'var(--danger)':'var(--warn)';
+    const links=d.signals.filter(s=>s.verify_url).slice(0,3)
+      .map((s,i)=>`<a href="${esc(s.verify_url)}" target="_blank" rel="noopener">receipt ${i+1}</a>`).join(' · ');
     say(`<b style="color:${col}">${d.verdict.toUpperCase()}</b> — risk ${d.risk.toFixed(2)}.
       ${esc(d.reasons[0]||'')}<span class="tick">${d.evidence} verifiable signals ·
-      ${d.elapsed_ms} ms</span>`);
+      ${d.elapsed_ms} ms${links?' · '+links:''}</span>`);
   }
-  busy=false; $('#goBtn').disabled=false; $('#q').value='';
+  busy=false; $('#goBtn').disabled=false;
 }
-$('#goBtn').onclick=ask;
-$('#q').addEventListener('keydown',e=>{if(e.key==='Enter')ask();});
+
+function submit(){
+  const t=$('#q').value.trim(); if(!t) return;
+  $('#q').value='';
+  if(isScreenable(t)) screenChat(t); else startTask(t);
+}
+$('#goBtn').onclick=submit;
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+$('#tryTask').onclick=()=>{ $('#q').value=DEFAULT_TASK; submit(); };
+
+const SUGG=[['task','Buy a 4K webcam under $150', DEFAULT_TASK],
+  ['screen','Tornado Cash','0x722122dF12D4e14e13Ac3b6895a86e84145b6967'],
+  ['screen','Bybit exploiter','0x47666Fab8bd0Ac7003bce3f5C3585383F09486E2'],
+  ['screen','vitalik.eth','vitalik.eth']];
+$('#sugg').innerHTML=SUGG.map(([k,l,v])=>
+  `<button class="sg-chip" data-v="${esc(v)}">${esc(l)}</button>`).join('');
+document.querySelectorAll('.sg-chip').forEach(b=>
+  b.onclick=()=>{ $('#q').value=b.dataset.v; submit(); });
 
 async function refreshStatus(){
   try{
@@ -471,17 +478,13 @@ async function refreshStatus(){
     if(d.ok){const n=Object.values(d.miners).reduce((a,b)=>a+b,0);
       $('#mcount').textContent=`${n} live miners`;}
     if(d.signer){
-      const bal = (d.usdc===null||d.usdc===undefined) ? '?' : d.usdc.toFixed(2);
+      const bal=(d.usdc==null)?'?':d.usdc.toFixed(2);
       $('#wtext').innerHTML=`<b>${d.signer.slice(0,6)}…${d.signer.slice(-4)}</b> · ${bal} USDC`;
       if(d.explorer) $('#wallet').href=d.explorer;
-    } else {
-      $('#wtext').textContent='no wallet key';
-    }
+    } else $('#wtext').textContent='no wallet key';
   }catch(e){$('#mcount').textContent='offline';}
 }
-refreshStatus();
-// Each screening spends real USDC — keep the header honest about it.
-setInterval(refreshStatus, 20000);
+refreshStatus(); setInterval(refreshStatus, 20000);
 </script>
 </body>
 </html>
