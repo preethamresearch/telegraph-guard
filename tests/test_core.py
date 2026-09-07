@@ -182,6 +182,48 @@ async def test_tx_target_fans_out_to_tx_lookup():
     assert v.verdict == "block"
 
 
+async def test_real_chainsight_prose_payload_allows_a_clean_address():
+    """Regression: the shapes miner 302 actually returned on the live node.
+
+    ChainSight answers FRAUD_DETECTION in prose with no numeric score. Before
+    prose extraction this degraded a clean address to `review`, which would
+    have made the demo's allow case fail.
+    """
+    fake = FakeEngine({
+        INTENT_FRAUD: engine_reply(INTENT_FRAUD, "302", "ChainSight", {
+            "address": ADDR,
+            "answer": (
+                "Based on publicly available blockchain analytics and "
+                "fraud-intelligence sources, the address does not appear in any "
+                "known scam, phishing, or fraud database, and no reports of "
+                "malicious activity are associated with it."
+            ),
+        }),
+        INTENT_WALLET: engine_reply(INTENT_WALLET, "302", "ChainSight", {
+            "address": ADDR,
+            "balance_eth": 812.4,
+            "chain": "ethereum",
+            "signal": "The Ethereum account holds 812.4 ETH.",
+        }),
+    })
+    v = await guard_with(fake).screen(ADDR)
+
+    assert v.verdict == "allow"
+    assert v.risk == pytest.approx(0.15)
+
+
+async def test_prose_fraud_report_blocks():
+    fake = FakeEngine({
+        INTENT_FRAUD: engine_reply(INTENT_FRAUD, "302", "ChainSight", {
+            "answer": "This address is sanctioned and appears on the OFAC SDN list.",
+        }),
+        INTENT_WALLET: engine_reply(INTENT_WALLET, "302", "ChainSight",
+                                    {"balance_eth": 0.0, "tx_count": 400}),
+    })
+    v = await guard_with(fake).screen(ADDR)
+    assert v.verdict == "block"
+
+
 # --- failure handling -------------------------------------------------------
 
 

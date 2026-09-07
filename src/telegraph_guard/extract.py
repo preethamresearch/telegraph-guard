@@ -120,6 +120,107 @@ def extract_confidence(result: Any) -> float | None:
     return None
 
 
+# --- Prose fallback ---------------------------------------------------------
+#
+# Several miners answer in natural language with no numeric score at all.
+# Observed live from ChainSight (302) on FRAUD_DETECTION:
+#
+#   {"address": "0xabab…", "answer": "Based on publicly available blockchain
+#    analytics and fraud-intelligence sources, the address … does not appear
+#    in any known scam, phishing, or fraud database, and no …"}
+#
+# Without this fallback such a miner contributes nothing, and a clean address
+# degrades to `review` — safe, but useless as a gate.
+#
+# Prose is weaker evidence than a number, so the values below are pulled in
+# from the extremes: a prose "safe" is 0.15, not 0.05, and a prose "risky" is
+# 0.8, not 0.95. Both still clear the default thresholds, but a single
+# contradicting numeric signal outweighs them.
+
+_PROSE_KEYS = (
+    "answer", "summary", "signal", "explanation", "reasoning", "analysis",
+    "conclusion", "assessment", "message", "description", "details", "text",
+)
+
+PROSE_SAFE_RISK = 0.15
+PROSE_UNSAFE_RISK = 0.8
+
+_SAFE_PATTERNS = (
+    r"do(?:es)?\s+not\s+appear",
+    r"\bno\s+(?:known\s+)?(?:evidence|indication|indications|reports?|records?|"
+    r"history|signs?|association)\b",
+    r"\bnot\s+(?:been\s+)?(?:flagged|blacklisted|reported|sanctioned|associated|linked)\b",
+    r"\bappears?\s+(?:to\s+be\s+)?(?:legitimate|safe|clean|benign|normal|unremarkable)\b",
+    r"\bis\s+(?:a\s+)?(?:well[-\s]known|legitimate|verified|official|reputable)\b",
+    r"\blow[-\s]risk\b",
+    r"\bno\s+(?:known\s+)?(?:scam|phishing|fraud|malicious|suspicious)\b",
+)
+
+_UNSAFE_PATTERNS = (
+    r"\b(?:is|was|has\s+been)\s+(?:flagged|blacklisted|reported|sanctioned)\b",
+    r"\bknown\s+(?:scam|phishing|fraud|malicious|phishing\s+site)\b",
+    r"\bconfirmed\s+(?:scam|phishing|fraud|malicious)\b",
+    r"\bhigh(?:ly)?[-\s](?:risk|suspicious)\b",
+    r"\bappears?\s+(?:to\s+be\s+)?(?:fraudulent|malicious|suspicious|a\s+scam)\b",
+    r"\bassociated\s+with\b[^.]{0,60}?\b(?:theft|hack|exploit|scam|launder\w*|"
+    r"stolen|ransom\w*)\b",
+    r"\b(?:ofac|sanction(?:ed|s)|tornado\s+cash|lazarus)\b",
+    r"\bstolen\s+funds\b",
+    r"\bphishing\s+(?:site|page|domain|campaign)\b",
+    r"\bdo\s+not\s+(?:send|interact|proceed)\b",
+)
+
+#: Words that flip the meaning of a following risk phrase. "no known scam"
+#: must not read as "known scam".
+_NEGATORS = (
+    "no", "not", "never", "without", "free of", "absent", "n't", "none",
+    "nothing", "neither", "nor", "lacks", "lacking",
+)
+_NEGATION_WINDOW = 45
+
+
+def _is_negated(text: str, start: int) -> bool:
+    """Whether a risk phrase at ``start`` sits inside a negation."""
+    window = text[max(0, start - _NEGATION_WINDOW) : start]
+    # Do not read across a sentence boundary — a new sentence resets polarity.
+    window = re.split(r"[.;]", window)[-1]
+    return any(re.search(rf"\b{re.escape(n)}\b", window) for n in _NEGATORS)
+
+
+def _collect_prose(result: Any) -> str:
+    parts = [result] if isinstance(result, str) else []
+    for key, val in _walk(result):
+        if key in _PROSE_KEYS and isinstance(val, str):
+            parts.append(val)
+    return "  ".join(parts).lower()
+
+
+def extract_risk_from_prose(result: Any) -> float | None:
+    """Read a risk judgement out of a natural-language answer.
+
+    Returns None whenever the text is ambiguous or says nothing decisive —
+    an unclear answer becomes `review`, never an allow.
+    """
+    text = _collect_prose(result)
+    if len(text) < 12:
+        return None
+
+    safe_hits = sum(1 for p in _SAFE_PATTERNS if re.search(p, text))
+
+    unsafe_hits = 0
+    for pattern in _UNSAFE_PATTERNS:
+        for m in re.finditer(pattern, text):
+            if not _is_negated(text, m.start()):
+                unsafe_hits += 1
+
+    if unsafe_hits > safe_hits:
+        return PROSE_UNSAFE_RISK
+    if safe_hits > unsafe_hits:
+        return PROSE_SAFE_RISK
+    # Tie, including 0-0: the miner did not commit, so neither do we.
+    return None
+
+
 def extract_risk(result: Any) -> float | None:
     """Normalised 0 = safe … 1 = fraud, or None when nothing is interpretable.
 
@@ -150,11 +251,15 @@ def extract_risk(result: Any) -> float | None:
             if t is not None:
                 return t
 
-    # Last resort: a bare verdict string sitting at the top level.
+    # A bare verdict string sitting at the top level.
     if isinstance(result, str):
-        return _tier_value(result)
+        tier = _tier_value(result)
+        if tier is not None:
+            return tier
 
-    return None
+    # Last resort: the miner answered in prose. Weakest evidence, so it is
+    # only consulted once every structured avenue is exhausted.
+    return extract_risk_from_prose(result)
 
 
 # --- Contextual heuristics (FR-8) -------------------------------------------
