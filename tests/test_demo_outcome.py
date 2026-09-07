@@ -133,3 +133,34 @@ def test_a_fully_real_run_exits_zero(capsys):
     out = capsys.readouterr().out
     assert code == 0
     assert "3 of 3 passed on real miner evidence" in out
+
+
+# --- replay must never look like a live pass --------------------------------
+
+
+def test_replay_never_claims_miner_evidence(capsys):
+    """Replay drives the same pipeline, so every case legitimately has
+    signals — but the payloads are stored, and the summary must say so."""
+    code = report(_results([
+        ("allow", "allow", [real_signal()]),
+        ("block", "block", [real_signal()]),
+        ("block", "block", [real_signal()]),
+    ]), replay=True)
+    out = capsys.readouterr().out
+
+    assert "passed on real miner evidence" not in out
+    assert "STORED PAYLOADS" in out
+    # A replay must be distinguishable from a live pass by exit code alone,
+    # or CI and recording scripts cannot tell them apart.
+    assert code == 3
+    assert code != 0
+
+
+def test_replay_still_reports_a_genuine_mismatch(capsys):
+    """A pipeline regression must surface even in replay."""
+    code = report(_results([
+        ("allow", "block", [real_signal()]),
+        ("block", "block", [real_signal()]),
+    ]), replay=True)
+    assert code == 1
+    assert "did not match" in capsys.readouterr().out

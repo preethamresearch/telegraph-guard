@@ -157,18 +157,26 @@ async def main() -> int:
     p.add_argument("--no-send", action="store_true", help="screen only, never transfer")
     p.add_argument("--no-warmup", action="store_true")
     p.add_argument("--deadline-ms", type=int, default=15000)
+    p.add_argument(
+        "--replay",
+        action="store_true",
+        help="run the pipeline against stored payloads instead of live miners "
+        "(no signal hashes, not valid for submission)",
+    )
     args = p.parse_args()
 
     cfg = GuardConfig(deadline_ms=args.deadline_ms)
-    guard = Guard(cfg)
-    app = build_graph(guard, cfg, send=not args.no_send)
+    guard = replay_guard(cfg) if args.replay else Guard(cfg)
+    app = build_graph(guard, cfg, send=not args.replay and not args.no_send)
 
     print(f"\n{BOLD}  TelegraphGuard — agent invoice run{RESET}")
     print(f"{DIM}  guard between the agent's intent and its wallet{RESET}")
+    if args.replay:
+        banner()
 
     results = []
     try:
-        if not args.no_warmup:
+        if not args.no_warmup and not args.replay:
             print(f"\n{DIM}  warming miners...{RESET}")
             await guard.warmup()
 
@@ -191,7 +199,79 @@ async def main() -> int:
     finally:
         await guard.aclose()
 
-    return report(results)
+    if args.replay:
+        banner()
+    return report(results, replay=args.replay)
+
+
+# --- replay mode ------------------------------------------------------------
+#
+# Replay drives the real pipeline — classification, extraction, aggregation,
+# gating, LangGraph routing — against stored payloads. Only the network is
+# replaced. It is for inspecting the guard without a funded wallet, and is
+# labelled everywhere it appears so it can never be mistaken for a live run.
+
+
+def banner() -> None:
+    import fixtures
+
+    counts = fixtures.provenance()
+    print()
+    print(f"  {YELLOW}{'─' * 66}{RESET}")
+    print(f"  {YELLOW}{BOLD}REPLAY MODE — no miners were called.{RESET}")
+    print(
+        f"  {YELLOW}Stored payloads: {counts['captured']} captured from the live "
+        f"Engine, {counts['constructed']} constructed.{RESET}"
+    )
+    print(
+        f"  {YELLOW}Signal hashes shown are placeholders and resolve to nothing. "
+        f"This{RESET}"
+    )
+    print(f"  {YELLOW}shows the pipeline, not miner quality. Not for submission.{RESET}")
+    print(f"  {YELLOW}{'─' * 66}{RESET}")
+
+
+def replay_guard(cfg: GuardConfig) -> Guard:
+    """A Guard whose Engine transport answers from stored payloads."""
+    import json
+
+    import httpx
+
+    import fixtures
+    from telegraph_guard.core import Guard as _Guard
+    from telegraph_guard.discovery import Registry, _parse_miner
+    from telegraph_guard.types import TARGET_INTENTS
+
+    def intent_of(query: str) -> str:
+        q = query.lower()
+        if "safe to click" in q:
+            return "URL_SCAN"
+        if "balance" in q:
+            return "WALLET_BALANCE_CHECK"
+        if "status and gas used" in q:
+            return "ONCHAIN_TX_LOOKUP"
+        return "FRAUD_DETECTION"
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content or b"{}")
+        query = body.get("query", "")
+        intent = intent_of(query)
+        # The target is the long token in the query.
+        target = max(query.replace("?", " ").split(), key=len, default="")
+        rec = fixtures.lookup(target, intent)
+        if rec is None:
+            return httpx.Response(404, json={"error": f"no fixture for {intent}"})
+        await asyncio.sleep(rec["duration_ms"] / 4000)  # keep the pacing legible
+        return httpx.Response(200, json=rec)
+
+    stub = _parse_miner({"id": "0", "name": "replay", "endpoints": []})
+    return _Guard(
+        cfg,
+        registry=Registry(
+            by_intent={i: [stub] for i in TARGET_INTENTS}, fetched_at=float("inf")
+        ),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
 
 
 # --- outcome classification -------------------------------------------------
@@ -231,11 +311,15 @@ def classify_outcome(v, expected: str) -> str:
     return PASS if v.verdict == expected else FAIL
 
 
-def report(results) -> int:
+def report(results, replay: bool = False) -> int:
     """Print the summary and return a shell exit code.
 
     Non-zero unless every case passed on real evidence, so a recorded run
     or a CI job cannot quietly present an inconclusive result as a success.
+
+    In replay mode the signals are stored payloads, so the summary must not
+    claim miner evidence and the exit code must never be 0 — otherwise a
+    replay would be indistinguishable from a live pass in CI or a recording.
     """
     print(f"\n{BOLD}  Summary{RESET}")
     counts = {PASS: 0, FAIL: 0, INCONCLUSIVE: 0}
@@ -272,6 +356,17 @@ def report(results) -> int:
     if counts[FAIL]:
         print(f"  {RED}{counts[FAIL]} of {total} did not match expectations.{RESET}\n")
         return 1
+    if replay:
+        print(
+            f"  {YELLOW}{total} of {total} matched — against STORED PAYLOADS, "
+            f"not live miners.{RESET}"
+        )
+        print(
+            f"  {YELLOW}This shows the pipeline works. It says nothing about "
+            f"miner quality,{RESET}"
+        )
+        print(f"  {YELLOW}and produced no verifiable signal hashes.{RESET}\n")
+        return 3
     print(f"  {GREEN}{total} of {total} passed on real miner evidence.{RESET}\n")
     return 0
 
