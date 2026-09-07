@@ -57,7 +57,8 @@ consecutive live demo runs):
 
 ### Post 3 — receipts
 
-> The part I care about: every verdict carries an on-chain signal_hash.
+> The part I care about: every @Telegraphprotoc verdict carries an on-chain
+> signal_hash.
 >
 > You don't have to trust my API. Open the receipt and see which miner answered,
 > and when.
@@ -74,12 +75,28 @@ consecutive live demo runs):
 > · 6/6 live demo runs
 > · 37/39 correct on a labelled corpus
 >
-> The 2 misses were miner coverage gaps, not aggregation bugs. Details in the
-> repo — I'd rather publish them than hide them.
+> The 2 misses were @Telegraphprotoc miner coverage gaps, not aggregation
+> bugs. Details in the repo — I'd rather publish them than hide them.
 >
 > https://github.com/preethamresearch/telegraph-guard
 
-### Post 5 — the ask (optional)
+### Post 5 — flywheel evidence (this is what the judges say they want)
+
+> The hackathon brief says: "We are not looking for the best demo. We are
+> looking for real evidence that the quality flywheel works."
+>
+> Evidence from routing 590 real calls on @Telegraphprotoc:
+>
+> · Miner quality differs measurably: one FRAUD miner returned identical prose
+>   for a clean router and an OFAC-sanctioned mixer; another separated them
+>   0.10 vs 0.80.
+> · Demand followed quality: after calibration, 435 of our FRAUD calls went to
+>   the miner that discriminates.
+> · That demand is published per-miner, so it feeds their rankings.
+>
+> Better miners earned our traffic. That's the flywheel, observed.
+
+### Post 6 — the ask (optional)
 
 > If you run a FRAUD_DETECTION miner on @Telegraphprotoc: TelegraphGuard sends
 > you real demand from agents that are about to move money.
