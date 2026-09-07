@@ -5,7 +5,7 @@ can be checked before posting. **Nothing here has been posted** — these are
 drafts for you to send.
 
 Fill in before posting:
-- `<REPO>` — the public GitHub URL
+- `https://github.com/preethamresearch/telegraph-guard` — the public GitHub URL
 - `<VIDEO>` — the demo video link
 - `<HANDLE>` — your X handle, if you want it in the Discord post
 
@@ -63,7 +63,7 @@ consecutive live demo runs):
 > and when.
 >
 > 590 signals published in HASHES.md, all verifiable:
-> <REPO>/blob/main/HASHES.md
+> https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
 
 ### Post 4 — numbers, and the honest part
 
@@ -77,7 +77,7 @@ consecutive live demo runs):
 > The 2 misses were miner coverage gaps, not aggregation bugs. Details in the
 > repo — I'd rather publish them than hide them.
 >
-> <REPO>
+> https://github.com/preethamresearch/telegraph-guard
 
 ### Post 5 — the ask (optional)
 
@@ -110,7 +110,7 @@ and 5001.
 > | 5001 URL Sentinel | 10 |
 >
 > Per intent: FRAUD_DETECTION 265 · URL_SCAN 125 · WALLET_BALANCE_CHECK 100 ·
-> ONCHAIN_TX_LOOKUP 100. Full hash list: <REPO>/blob/main/HASHES.md
+> ONCHAIN_TX_LOOKUP 100. Full hash list: https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
 >
 > **Direct feedback from screening 64 real targets, in case it's useful:**
 >
@@ -139,7 +139,7 @@ and 5001.
 > only one that does, so address screening has a single point of failure —
 > a second implementation immediately makes every consumer more robust.
 >
-> Repo: <REPO>
+> Repo: https://github.com/preethamresearch/telegraph-guard
 
 ---
 
