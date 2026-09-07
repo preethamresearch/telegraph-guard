@@ -82,55 +82,43 @@ What's missing: more miners that take a bare address and return a 0-1 risk score
 
 # Discord — miner operator outreach (FR-43)
 
-Post in the hackathon / miner channel. Tag the operators for 9002, 20260828,
-and 5001.
+Post in the hackathon channel. Two messages (Discord free tier caps at 2000
+chars each; tables don't render — these are formatted for Discord). Post
+message 1, then message 2 as a reply/thread. Tag the operators if their
+handles are known.
 
-> **TelegraphGuard — 590 real signals routed to your miners**
->
-> Built a pre-transaction safety gate for AI agents with wallets. Before an
-> agent pays, it screens the destination across four intents and returns
-> allow / review / block. Every verdict is backed by your signals with
-> resolvable hashes.
->
-> **Demand routed to you over ~30 minutes:**
->
-> | Miner | Signals |
-> |---|---|
-> | 9002 TxLens | 435 |
-> | 20260828 PREFLIGHT Infrastructure Signals | 145 |
-> | 5001 URL Sentinel | 10 |
->
-> Per intent: FRAUD_DETECTION 265 · URL_SCAN 125 · WALLET_BALANCE_CHECK 100 ·
-> ONCHAIN_TX_LOOKUP 100. Full hash list: https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
->
-> **Direct feedback from screening 64 real targets, in case it's useful:**
->
-> **@9002 TxLens** — `/assess-wallet` is the best address-fraud endpoint I found
-> on the network. The 2,600-entity registry caught Tornado Cash as a known
-> mixer. Two notes: it returns `probability 0` for a mixer with
-> `assessment_status: NOT_APPLICABLE`, which a naive integration reads as
-> "safe" and allows a payment to a sanctioned address — I special-cased it,
-> but the polarity is a footgun. And the Uniswap V3 router scored 0.9, I think
-> circular-funding firing on a contract that legitimately returns funds to its
-> funders.
->
-> **@20260828 PREFLIGHT** — `/url-scan` was the most reliable scorer in the run:
-> 9/9 on live URLhaus malware URLs and 14/14 on known-good domains, with a
-> stated confidence every time. Nothing to fix.
->
-> **@302 ChainSight** — heads up, and I mean this constructively: `/fraud`
-> returned byte-identical prose ("does not appear in any known scam, phishing,
-> or fraud database") for the Uniswap router *and* for an OFAC-sanctioned
-> Tornado Cash address. Because the auto-router prefers you for
-> FRAUD_DETECTION, an integration that trusts it will allow payments to
-> sanctioned addresses. I had to pin miners to work around it.
->
-> **What would help most:** a FRAUD_DETECTION endpoint taking a bare address and
-> returning a 0-1 risk score with a stated confidence. Right now TxLens is the
-> only one that does, so address screening has a single point of failure —
-> a second implementation immediately makes every consumer more robust.
->
-> Repo: https://github.com/preethamresearch/telegraph-guard
+--- MESSAGE 1 ---
+
+**TelegraphGuard — 590 real signals routed to your miners** :shield:
+
+Built for Track 3: a pre-transaction safety gate for AI agents with wallets. Before an agent pays, it screens the destination across four intents and returns **allow / review / block**. Every verdict is backed by your signals, with resolvable hashes.
+
+**Try it live:** https://preethamresearch.github.io/telegraph-guard/
+**Repo:** https://github.com/preethamresearch/telegraph-guard
+**All 590 hashes:** https://github.com/preethamresearch/telegraph-guard/blob/main/HASHES.md
+
+**Demand routed per miner (~30 min soak):**
+`9002` TxLens — **435**
+`20260828` PREFLIGHT Infrastructure Signals — **145**
+`5001` URL Sentinel — **10**
+
+Per intent: FRAUD_DETECTION 265 · URL_SCAN 125 · WALLET_BALANCE_CHECK 100 · ONCHAIN_TX_LOOKUP 100
+
+These counts are yours to cite — application demand feeds the miner track's ranking. Feedback from screening 64 real targets in the next message :thread:
+
+--- MESSAGE 2 ---
+
+**Miner feedback from 64 real targets** (offered constructively — this made your endpoints part of a live product)
+
+**TxLens (9002)** — `/assess-wallet` is the best address-fraud endpoint on the network right now. The 2,600-entity registry caught Tornado Cash as a known mixer. Two notes:
+• it returns `probability 0` with `assessment_status: NOT_APPLICABLE` for a mixer — a naive integration reads that as "safe" and pays a sanctioned address. I special-cased it, but the polarity is a footgun.
+• the Uniswap V3 router scored 0.9 — I suspect circular-funding fires on contracts that legitimately return funds to funders.
+
+**PREFLIGHT (20260828)** — `/url-scan` was the most reliable scorer in the run: 9/9 on live URLhaus malware URLs, 14/14 on known-good domains, stated confidence every time. Nothing to fix.
+
+**ChainSight (302)** — heads up: `/fraud` returned byte-identical prose ("does not appear in any known scam, phishing, or fraud database") for the Uniswap router *and* an OFAC-sanctioned Tornado Cash address. Since the auto-router prefers you for FRAUD_DETECTION, integrations that trust it will allow payments to sanctioned addresses. I had to pin miners to work around it.
+
+**What would help every consumer most:** a second FRAUD_DETECTION endpoint that takes a bare address and returns a 0-1 risk score with stated confidence. TxLens is the only one today — a single point of failure for everyone screening addresses. Build it and TelegraphGuard routes to you.
 
 ---
 
