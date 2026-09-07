@@ -178,18 +178,101 @@ async def main() -> int:
             out = await app.ainvoke({"pending_payment": payment})
             v = out["guard_verdict"]
             print(render(v))
-            got = v.verdict
-            mark = "ok " if got == inv["expect"] else "DIFFERS"
-            print(f"    {DIM}expected {inv['expect']}, got {got}  [{mark}]{RESET}")
-            results.append((inv["name"], inv["expect"], got))
+
+            outcome = classify_outcome(v, inv["expect"])
+            colour = {PASS: GREEN, FAIL: RED, INCONCLUSIVE: YELLOW}[outcome]
+            print(
+                f"    {DIM}expected {inv['expect']}, got {v.verdict}{RESET}  "
+                f"{colour}[{outcome}]{RESET}"
+            )
+            if outcome == INCONCLUSIVE:
+                print(f"    {YELLOW}{DESCRIPTIONS[INCONCLUSIVE]}{RESET}")
+            results.append((inv["name"], inv["expect"], v, outcome))
     finally:
         await guard.aclose()
 
+    return report(results)
+
+
+# --- outcome classification -------------------------------------------------
+#
+# A verdict that matches for the wrong reason is not a passing demo. If the
+# guard never obtained a usable miner signal — an unfunded wallet, a dead
+# node, a blown deadline — then every target blocks identically and two of
+# three "expected block" cases match by accident. Reporting that as 2/3
+# passing would be actively misleading in a recorded demo, so evidence is
+# required before a match counts.
+
+PASS = "PASS"
+FAIL = "FAIL"
+INCONCLUSIVE = "INCONCLUSIVE"
+
+DESCRIPTIONS = {
+    INCONCLUSIVE: (
+        "^ no miner evidence — this blocked because screening never ran, "
+        "not because anything was flagged."
+    ),
+}
+
+
+def has_evidence(v) -> bool:
+    """Whether a verdict rests on real miner output.
+
+    A signal counts only if it came back without error AND carries a
+    signal_hash, which is what makes it independently verifiable.
+    """
+    return any(s.ok and s.signal_hash for s in v.signals)
+
+
+def classify_outcome(v, expected: str) -> str:
+    """PASS only when the verdict matches *and* real signals produced it."""
+    if not has_evidence(v):
+        return INCONCLUSIVE
+    return PASS if v.verdict == expected else FAIL
+
+
+def report(results) -> int:
+    """Print the summary and return a shell exit code.
+
+    Non-zero unless every case passed on real evidence, so a recorded run
+    or a CI job cannot quietly present an inconclusive result as a success.
+    """
     print(f"\n{BOLD}  Summary{RESET}")
-    for name, expect, got in results:
-        colour = GREEN if got == expect else YELLOW
-        print(f"    {colour}{got:<7}{RESET} (expected {expect:<7}) {name}")
+    counts = {PASS: 0, FAIL: 0, INCONCLUSIVE: 0}
+    for name, expect, v, outcome in results:
+        counts[outcome] += 1
+        colour = {PASS: GREEN, FAIL: RED, INCONCLUSIVE: YELLOW}[outcome]
+        n_sig = len([s for s in v.signals if s.ok and s.signal_hash])
+        print(
+            f"    {colour}{outcome:<12}{RESET} {v.verdict:<6} "
+            f"(expected {expect:<6}) {DIM}{n_sig} signals{RESET}  {name}"
+        )
+
+    total = len(results)
     print()
+    if counts[INCONCLUSIVE] == total:
+        print(f"  {YELLOW}{BOLD}THIS RUN PROVED NOTHING.{RESET}")
+        print(
+            f"  {YELLOW}No target produced a single verifiable miner signal, so "
+            f"every invoice{RESET}"
+        )
+        print(
+            f"  {YELLOW}blocked for the same reason. The guard failed closed "
+            f"correctly — but no{RESET}"
+        )
+        print(f"  {YELLOW}screening happened. Do not present this as a demo.{RESET}")
+        print(f"\n  {DIM}Fund the signer, then re-run:  telegraph-guard wallet{RESET}\n")
+        return 2
+    if counts[INCONCLUSIVE]:
+        print(
+            f"  {YELLOW}{counts[INCONCLUSIVE]} of {total} inconclusive — "
+            f"those cases had no miner evidence.{RESET}\n"
+        )
+        return 2
+    if counts[FAIL]:
+        print(f"  {RED}{counts[FAIL]} of {total} did not match expectations.{RESET}\n")
+        return 1
+    print(f"  {GREEN}{total} of {total} passed on real miner evidence.{RESET}\n")
     return 0
 
 
