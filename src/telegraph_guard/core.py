@@ -107,10 +107,27 @@ class Guard:
         return self._free_client
 
     async def registry(self) -> Registry:
-        """Cached miner registry, refreshed every 10 min (FR-13)."""
+        """Cached miner registry, refreshed every 10 min (FR-13).
+
+        Discovery is a free endpoint but it does blip. Observed live: a
+        single failed refresh raised DiscoveryError out of every concurrent
+        signal, so the screen produced no judgement at all — and, being
+        fail-closed, reported a `block` that looked exactly like a caught
+        fraud. A stale registry is far better than none, so a refresh
+        failure keeps the last good one and retries next call. Only a
+        failure with nothing cached propagates.
+        """
         async with self._lock:
-            if self._registry is None or self._registry.stale:
+            if self._registry is not None and not self._registry.stale:
+                return self._registry
+            try:
                 self._registry = await fetch_registry(await self._free())
+            except Exception:
+                if self._registry is None:
+                    raise
+                log.warning(
+                    json.dumps({"event": "discovery_refresh_failed", "using": "cached"})
+                )
             return self._registry
 
     async def aclose(self) -> None:
