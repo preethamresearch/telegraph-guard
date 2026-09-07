@@ -77,12 +77,19 @@ class Guard:
         config: GuardConfig | None = None,
         private_key: str | None = None,
         registry: Registry | None = None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
+        """
+        Args:
+            client: pre-built transport for the paid Engine calls. Supplying
+                one bypasses x402 client construction — used by the offline
+                test suite, and by callers who manage their own signer.
+        """
         self.config = config or GuardConfig()
         self._private_key = private_key
         self._registry = registry
-        self._client: httpx.AsyncClient | None = None
-        self._free_client: httpx.AsyncClient | None = None
+        self._client = client
+        self._free_client = None
         self._lock = asyncio.Lock()
 
     # -- plumbing ----------------------------------------------------------
