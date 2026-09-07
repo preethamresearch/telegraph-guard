@@ -23,9 +23,14 @@ REFRESH_SECONDS = 600  # FR-13: refresh every 10 min.
 #: endpoint description. Ordered most-specific first so that, for example,
 #: ONCHAIN_TX_LOOKUP prefers "/tx-lookup" over a bare "/tx".
 _PATH_HINTS: dict[str, tuple[str, ...]] = {
+    # An address-shaped target must prefer an address-shaped endpoint.
+    # TxLens exposes both /fraud-query (a named scheme, "was BitConnect a
+    # scam") and /assess-wallet (an address, checked against a registry of
+    # 2,600+ OFAC and scam entities). Matching "fraud" first picked the
+    # wrong one and the miner rejected the payload outright.
     "FRAUD_DETECTION": (
-        "fraud-detection", "fraud-query", "fraud", "risk-check", "anomaly",
-        "risk", "assess", "analyze",
+        "assess-wallet", "wallet-risk", "fraud-detection", "risk-check",
+        "anomaly", "fraud-query", "fraud", "risk", "assess", "analyze",
     ),
     "URL_SCAN": ("url-scan", "urlscan", "url", "scan"),
     "WALLET_BALANCE_CHECK": ("wallet-balance", "wallet/balance", "balance", "wallet"),

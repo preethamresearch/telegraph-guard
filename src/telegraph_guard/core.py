@@ -192,9 +192,14 @@ class Guard:
         reg = await self.registry()
         candidates = reg.miners_for(intent)
         if config.miners:
-            wanted = {str(m) for m in config.miners}
-            preferred = [m for m in candidates if m.id in wanted]
-            candidates = preferred + [m for m in candidates if m.id not in wanted]
+            # Preserve the caller's priority order, not the registry's. When a
+            # demo pins ["9002", "10002"] it means "9002 first" — sorting by
+            # registry order silently used whichever happened to be listed
+            # first upstream.
+            wanted = [str(m) for m in config.miners]
+            by_id = {m.id: m for m in candidates}
+            preferred = [by_id[w] for w in wanted if w in by_id]
+            candidates = preferred + [m for m in candidates if m.id not in set(wanted)]
         if skip:
             candidates = [m for m in candidates if m.id != skip]
 
@@ -223,13 +228,38 @@ class Guard:
     def _payload_for(
         intent: str, target: str, target_type: TargetType, chain: str
     ) -> dict[str, Any]:
-        """Payload for the direct path. Field names follow the conventions the
-        wallet/tx/url miners publish in their endpoint descriptions."""
+        """Payload for the direct path.
+
+        Miners disagree on parameter names for the same value — TxLens wants
+        ``wallet``, ChainSight ``address``, DegenLens a natural-language
+        ``query`` — and reject the request outright when the expected name is
+        missing. The registry documents these only in prose, so rather than
+        parse English we send every known alias for the one value plus a
+        natural-language query. Extra keys are ignored by every miner
+        observed; a missing one is a hard failure.
+        """
         if intent == INTENT_TX or target_type == "tx":
-            return {"tx_hash": target, "hash": target, "chain": chain}
+            return {
+                "tx_hash": target,
+                "hash": target,
+                "transaction_hash": target,
+                "tx": target,
+                "chain": chain,
+                "query": f"What was the status and gas used of transaction {target} on {chain}?",
+            }
         if intent == INTENT_URL or target_type == "url":
-            return {"url": target}
-        return {"address": target, "chain": chain}
+            return {
+                "url": target,
+                "target": target,
+                "query": f"Is this URL safe to click: {target}?",
+            }
+        return {
+            "address": target,
+            "wallet": target,
+            "account": target,
+            "chain": chain,
+            "query": f"How likely is the address {target} on {chain} to be fraudulent?",
+        }
 
     @staticmethod
     def _decorate(sig: Signal) -> None:
@@ -240,6 +270,14 @@ class Guard:
             sig.confidence = extract_confidence(sig.raw)
         if sig.risk is None:
             sig.risk = extract_risk(sig.raw)
+
+        # A miner that reports confidence 0 is reporting nothing. Observed
+        # live from DegenLens, which answers `risk 0.0, confidence 0.0` for
+        # an address it has no coverage of — read literally that is a
+        # maximally safe score, and it dragged a sanctioned address toward
+        # allow. Zero confidence means no information, not no risk.
+        if sig.confidence == 0.0 and sig.risk is not None:
+            sig.risk = None
 
     @staticmethod
     def _log(sig: Signal, target: str) -> None:

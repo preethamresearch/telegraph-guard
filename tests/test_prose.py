@@ -148,3 +148,66 @@ def test_reads_nested_prose():
     assert extract_risk_from_prose(
         {"data": {"result": {"answer": "The domain is a known phishing site."}}}
     ) == PROSE_UNSAFE_RISK
+
+
+# --- Real TxLens payloads, captured live from /assess-wallet ----------------
+#
+# The mixer case is the one that matters: TxLens reports probability 0 for a
+# sanctioned Tornado Cash router, because its fraud model does not apply to a
+# mixer. Reading that 0 as safe would allow a payment to an OFAC address.
+
+TXLENS_TORNADO = {
+    "status": "NOT_APPLICABLE",
+    "assessment_status": "INCONCLUSIVE",
+    "confidence": 0.95,
+    "wallet": "0x722122dF12D4e14e13Ac3b6895a86e84145b6967",
+    "answer": (
+        "NOT_APPLICABLE: this address is not a standard funded wallet "
+        "(burn/null or known mixer). Probability 0 (0% risk)."
+    ),
+}
+
+TXLENS_BYBIT_HACKER = {
+    "assessment_status": "LIMITED",
+    "confidence": 0.7,
+    "answer": (
+        "HIGH risk: wallet sent funds directly back to its own funder "
+        "(circular funding). Probability 0.9 (90% risk)."
+    ),
+}
+
+TXLENS_UNISWAP = {
+    "assessment_status": "LIMITED",
+    "confidence": 0.35,
+    "answer": (
+        "INCONCLUSIVE: not enough evidence gathered to reach a confident "
+        "verdict. Probability 0.1 (10% risk)."
+    ),
+}
+
+
+def test_declined_assessment_does_not_read_probability_zero_as_safe():
+    from telegraph_guard.extract import declined_to_assess
+
+    assert declined_to_assess(TXLENS_TORNADO)
+    risk = extract_risk(TXLENS_TORNADO)
+    assert risk is not None and risk >= 0.7, "a known mixer must not be allowed"
+
+
+def test_negation_does_not_swallow_a_parenthetical_assertion():
+    """'is not a standard funded wallet (burn/null or known mixer)' —
+    the 'not' negates the wallet type, not the mixer finding."""
+    assert extract_risk_from_prose(TXLENS_TORNADO) == PROSE_UNSAFE_RISK
+
+
+def test_stated_probability_is_read():
+    assert extract_risk(TXLENS_BYBIT_HACKER) == pytest.approx(0.9)
+    assert extract_risk(TXLENS_UNISWAP) == pytest.approx(0.1)
+
+
+def test_real_payloads_separate_cleanly_across_the_thresholds():
+    clean = extract_risk(TXLENS_UNISWAP)
+    hacker = extract_risk(TXLENS_BYBIT_HACKER)
+    mixer = extract_risk(TXLENS_TORNADO)
+    assert clean < 0.3 <= 0.7 <= hacker
+    assert mixer >= 0.7

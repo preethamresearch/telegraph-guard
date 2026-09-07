@@ -139,6 +139,23 @@ def aggregate(
     else:
         verdict = "review"
 
+    # An allow requires positive evidence of safety, not merely the absence of
+    # a finding. A miner that states no confidence has told us how sure it is:
+    # not at all. Observed live — with PREFLIGHT unavailable, the URL_SCAN
+    # fallback landed on ChainSight, which scored a live malware dropper 0.10
+    # with no confidence, and that lone signal authorised the payment.
+    #
+    # Such a signal may still raise risk (above), but it may not clear one.
+    if verdict == "allow":
+        primary = [
+            s for s in usable if s.intent in PRIMARY_INTENTS and s.risk is not None
+        ]
+        if not any(s.confidence is not None for s in primary):
+            verdict = "review"
+            reasons.append(
+                "no miner stated a confidence — insufficient evidence to allow"
+            )
+
     if not reasons:
         reasons.append(f"aggregate risk {risk:.2f} from {len(usable)} signals")
 

@@ -171,3 +171,39 @@ def test_config_validation():
         GuardConfig(allow_below=0.9, block_above=0.2)
     with pytest.raises(ValueError):
         GuardConfig(min_signals=0)
+
+
+# --- an allow needs positive evidence, not just absence of a finding --------
+#
+# Observed live: with PREFLIGHT unavailable, URL_SCAN fell back to ChainSight,
+# which scored a live malware URL 0.10 with no stated confidence. That single
+# signal authorised the payment.
+
+
+def test_low_risk_without_stated_confidence_does_not_allow():
+    v = aggregate(
+        "http://malware.example/bin.sh", "url",
+        [sig(INTENT_URL, 0.10, None), sig(INTENT_FRAUD, None, 0.7)],
+        GuardConfig(min_signals=1),
+    )
+    assert v.verdict == "review"
+    assert any("confidence" in r for r in v.reasons)
+
+
+def test_low_risk_with_stated_confidence_still_allows():
+    v = aggregate(
+        "0xabc", "address",
+        [sig(INTENT_FRAUD, 0.10, 0.35), sig(INTENT_WALLET, raw={"tx_count": 900})],
+        GuardConfig(min_signals=1),
+    )
+    assert v.verdict == "allow"
+
+
+def test_unstated_confidence_can_still_raise_risk_to_block():
+    """The rule restricts allows only — it must not weaken a block."""
+    v = aggregate(
+        "0xabc", "address",
+        [sig(INTENT_FRAUD, 0.95, None)],
+        GuardConfig(min_signals=1),
+    )
+    assert v.verdict == "block"

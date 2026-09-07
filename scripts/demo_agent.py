@@ -54,9 +54,21 @@ INVOICES = [
         "expect": "block",
     },
     {
+        # A live malware-distribution URL from the URLhaus public blocklist.
+        #
+        # Google's Safe Browsing *test* endpoints were tried first and scored
+        # only 0.37 — correctly, because they are legitimate Google-owned
+        # infrastructure hosting no payload, and a working scanner should not
+        # flag them. FR-30 asks for a URL from a public phishing blocklist,
+        # pre-tested for separation; this one scores 0.9 against PREFLIGHT
+        # while ethereum.org scores 0.0.
+        #
+        # URLhaus entries go offline as hosts are taken down. If this stops
+        # separating, pull a fresh `online` row from
+        # https://urlhaus.abuse.ch/downloads/csv_recent/ and re-test.
         "name": "Invoice 3 — payment page reached from an agent's web browse",
         "to": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-        "url": "http://testsafebrowsing.appspot.com/s/phishing.html",
+        "url": "http://105.186.81.49:43127/bin.sh",
         "amount": "0.01",
         "chain": "ethereum",
         "expect": "block",
@@ -158,6 +170,11 @@ async def main() -> int:
     p.add_argument("--no-warmup", action="store_true")
     p.add_argument("--deadline-ms", type=int, default=15000)
     p.add_argument(
+        "--miners",
+        default="9002,10002,20260828",
+        help="miner ids to pin for the run (FR-5 direct mode)",
+    )
+    p.add_argument(
         "--replay",
         action="store_true",
         help="run the pipeline against stored payloads instead of live miners "
@@ -165,7 +182,14 @@ async def main() -> int:
     )
     args = p.parse_args()
 
-    cfg = GuardConfig(deadline_ms=args.deadline_ms)
+    # Direct-miner mode (FR-5). Calibration against the live node showed the
+    # auto-router lands FRAUD_DETECTION on ChainSight (302), which returns the
+    # same canned "no malicious indicators" prose for a clean router and for an
+    # OFAC-sanctioned mixer — it does not discriminate. TxLens (9002)
+    # /assess-wallet checks a registry of 2,600+ OFAC and scam entities and
+    # separates the same targets cleanly. This is what FR-5 is for: pinning
+    # miners for a deterministic demo.
+    cfg = GuardConfig(deadline_ms=args.deadline_ms, miners=args.miners.split(","))
     guard = replay_guard(cfg) if args.replay else Guard(cfg)
     app = build_graph(guard, cfg, send=not args.replay and not args.no_send)
 

@@ -168,6 +168,12 @@ _UNSAFE_PATTERNS = (
     r"\bstolen\s+funds\b",
     r"\bphishing\s+(?:site|page|domain|campaign)\b",
     r"\bdo\s+not\s+(?:send|interact|proceed)\b",
+    # A mixer or tumbler is a laundering venue. TxLens names one while
+    # simultaneously reporting probability 0, so this must register as a
+    # finding in its own right.
+    r"\b(?:known\s+)?(?:mixer|tumbler|coinjoin)\b",
+    r"\bcircular\s+funding\b",
+    r"\bburn\s*/?\s*null\s+address\b",
 )
 
 #: Words that flip the meaning of a following risk phrase. "no known scam"
@@ -180,10 +186,20 @@ _NEGATION_WINDOW = 45
 
 
 def _is_negated(text: str, start: int) -> bool:
-    """Whether a risk phrase at ``start`` sits inside a negation."""
+    """Whether a risk phrase at ``start`` sits inside a negation.
+
+    The lookback stops at a clause boundary. Sentence breaks are obvious;
+    an opening parenthesis matters just as much, because a parenthetical
+    asserts rather than inherits. TxLens writes:
+
+        "this address is not a standard funded wallet (burn/null or known mixer)"
+
+    The "not" negates *a standard funded wallet*. "known mixer" inside the
+    parenthetical is a positive claim about what the address IS, and reading
+    it as negated would discard the one finding in the response.
+    """
     window = text[max(0, start - _NEGATION_WINDOW) : start]
-    # Do not read across a sentence boundary — a new sentence resets polarity.
-    window = re.split(r"[.;]", window)[-1]
+    window = re.split(r"[.;(]", window)[-1]
     return any(re.search(rf"\b{re.escape(n)}\b", window) for n in _NEGATORS)
 
 
@@ -221,12 +237,71 @@ def extract_risk_from_prose(result: Any) -> float | None:
     return None
 
 
+# --- Assessment status ------------------------------------------------------
+#
+# Observed live from TxLens (9002) /assess-wallet on the OFAC-sanctioned
+# Tornado Cash router:
+#
+#   {"status": "NOT_APPLICABLE", "assessment_status": "INCONCLUSIVE",
+#    "summary": "NOT_APPLICABLE: this address is not a standard funded wallet
+#                (burn/null or known mixer). Probability 0 (0% risk).",
+#    "confidence": 0.95}
+#
+# The miner reports probability 0 — not because the address is safe, but
+# because its fraud model does not apply to a mixer. Reading that 0 as a
+# clean bill of health would allow a payment to a sanctioned address. A
+# miner that declines to reach a verdict has given us no verdict, so any
+# numeric score it carries must be discarded rather than trusted.
+
+_STATUS_KEYS = ("assessment_status", "status", "verdict_status", "result_status")
+_NON_VERDICT_STATUSES = {
+    "not_applicable", "notapplicable", "inconclusive", "unknown",
+    "out_of_coverage", "outofcoverage", "unavailable", "error", "insufficient",
+    "no_data", "nodata", "not_found", "notfound",
+}
+
+
+def declined_to_assess(result: Any) -> bool:
+    """Whether the miner explicitly declined to reach a verdict."""
+    for key, val in _walk(result):
+        if key in _STATUS_KEYS and isinstance(val, str):
+            if val.strip().lower().replace("-", "_") in _NON_VERDICT_STATUSES:
+                return True
+    return False
+
+
+#: "Probability 0.9 (90% risk)" — TxLens states its score in prose as well as
+#: in fields, and on some responses only in prose.
+_PROBABILITY_RE = re.compile(r"probability\s+(\d*\.?\d+)\s*\((\d+)\s*%\s*risk\)")
+
+
+def extract_probability(result: Any) -> float | None:
+    text = _collect_prose(result)
+    m = _PROBABILITY_RE.search(text)
+    if not m:
+        return None
+    try:
+        return max(0.0, min(1.0, float(m.group(1))))
+    except ValueError:
+        return None
+
+
 def extract_risk(result: Any) -> float | None:
     """Normalised 0 = safe … 1 = fraud, or None when nothing is interpretable.
 
     Precedence: explicit numeric risk > inverted safety score > boolean
-    danger flag > categorical tier. Earlier (shallower) keys win.
+    danger flag > categorical tier > stated probability > prose. Earlier
+    (shallower) keys win.
+
+    A miner that declined to assess yields None regardless of any score it
+    carried, unless its prose independently indicates danger.
     """
+    if declined_to_assess(result):
+        # It may still have said something alarming in passing — "known
+        # mixer" — which is a finding even when the score is not.
+        prose = extract_risk_from_prose(result)
+        return prose if prose is not None and prose >= 0.5 else None
+
     pairs = list(_walk(result))
 
     for key, val in pairs:
@@ -256,6 +331,11 @@ def extract_risk(result: Any) -> float | None:
         tier = _tier_value(result)
         if tier is not None:
             return tier
+
+    # A probability stated in the answer text, e.g. "Probability 0.9 (90% risk)".
+    prob = extract_probability(result)
+    if prob is not None:
+        return prob
 
     # Last resort: the miner answered in prose. Weakest evidence, so it is
     # only consulted once every structured avenue is exhausted.

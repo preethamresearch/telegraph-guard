@@ -182,12 +182,14 @@ async def test_tx_target_fans_out_to_tx_lookup():
     assert v.verdict == "block"
 
 
-async def test_real_chainsight_prose_payload_allows_a_clean_address():
+async def test_real_chainsight_prose_payload_scores_low_but_cannot_allow():
     """Regression: the shapes miner 302 actually returned on the live node.
 
-    ChainSight answers FRAUD_DETECTION in prose with no numeric score. Before
-    prose extraction this degraded a clean address to `review`, which would
-    have made the demo's allow case fail.
+    Prose extraction reads this as low risk (0.15), which is what lets a
+    clean address avoid a needless `review`. But ChainSight states no
+    confidence, and live calibration showed it returns this same text for
+    an OFAC-sanctioned mixer as for a clean router — so it must not be able
+    to authorise a payment on its own. Low risk, but still `review`.
     """
     fake = FakeEngine({
         INTENT_FRAUD: engine_reply(INTENT_FRAUD, "302", "ChainSight", {
@@ -208,8 +210,9 @@ async def test_real_chainsight_prose_payload_allows_a_clean_address():
     })
     v = await guard_with(fake).screen(ADDR)
 
-    assert v.verdict == "allow"
     assert v.risk == pytest.approx(0.15)
+    assert v.verdict == "review"
+    assert any("confidence" in r for r in v.reasons)
 
 
 async def test_prose_fraud_report_blocks():
