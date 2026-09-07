@@ -1,8 +1,28 @@
 # Demo video script (FR-32)
 
-**Target: 75 seconds. Terminal only, no slides, no voiceover required** — on-screen
-text captions are enough and survive being watched muted, which is how most
-judges will first see it.
+**Target: 75–90 seconds. No slides, no voiceover required** — on-screen text
+captions are enough and survive being watched muted, which is how most judges
+will first see it.
+
+**Primary cut: the web demo.** Start the server (`python webapp/server.py`),
+open http://127.0.0.1:8402, and record the browser at 1280×720+:
+
+1. (0:00–0:08) The task card — "Buy me a 4K webcam… under $150" — and the
+   headline. Caption: *An agent with a wallet is told to go shopping.*
+2. (0:08–0:15) Click **Let the agent shop**. Offers appear; the agent picks
+   the cheapest. Caption: *$89 is the best price. It's also the trap.*
+3. (0:15–0:40) First checkout: the guard screens the settlement address live.
+   Red verdict lands. Caption: *That storefront settles to an OFAC-sanctioned
+   address. Payment blocked — funds never left the wallet.*
+4. (0:40–0:60) The agent falls back, second checkout clears green, order
+   placed. Caption: *The guard is a filter, not a wall — the agent still
+   completes the purchase safely.*
+5. (0:60–0:75) Click a **verify ↗** link; the Engine receipt opens. Caption:
+   *Every verdict carries an on-chain signal hash anyone can check.*
+6. (0:75–0:85) The code snippet. Caption: *Three lines in a LangGraph app.
+   Also a CrewAI tool, CLI, and MCP server.*
+
+The terminal cut below remains as an alternative or B-roll.
 
 Record at 1280×720 or larger. Use a light-on-dark terminal, font size ~16pt so
 text is legible when the video is scaled down.
