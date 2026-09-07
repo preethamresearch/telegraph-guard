@@ -39,6 +39,10 @@ Homepage = "https://github.com/telegraph-guard/telegraph-guard"
 [tool.hatch.build.targets.wheel]
 packages = ["src/telegraph_guard"]
 
+[tool.hatch.build.targets.sdist]
+# The pip package is the SDK; demo dressing stays in the repo.
+exclude = ["webapp/img", "HASHES.md", "soak-signals.jsonl", "*.png"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

@@ -46,6 +46,26 @@ Fund that address with **Base Sepolia USDC** from [faucet.circle.com](https://fa
 
 ---
 
+## See it in 60 seconds — the web demo
+
+A shopping agent with its own wallet, guarded at checkout:
+
+```bash
+git clone <this repo> && cd telegraph-guard
+python -m venv .venv && .venv/bin/pip install -e '.[demo]' 'fastapi[standard]'
+echo 'TELEGRAPH_GUARD_KEY=0x...' > .env          # funded Base Sepolia key
+.venv/bin/python webapp/server.py                # → http://127.0.0.1:8402
+```
+
+Type a task — *"Buy me a 4K webcam under $150"* — and watch: the agent picks the
+cheapest merchant, the guard screens its settlement address against live Telegraph
+miners, blocks it (it settles to an OFAC-sanctioned address), falls back, and buys
+from the next merchant in budget. Type *"under $120"* instead and nothing safe fits —
+the agent refuses to spend and escalates. Every verdict links to an on-chain receipt.
+
+There is also a terminal reproduction of the Grok/Bankr-style prompt-injection
+drain in `scripts/injection_demo.py`, run once without the guard and once with it.
+
 ## Quickstart
 
 ```bash
