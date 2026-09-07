@@ -304,9 +304,13 @@ const screen = t => fetch('/api/screen',{method:'POST',
   headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t})}).then(r=>r.json());
 
 function card(m,cls,tag){
+  // Real product photography if scripts/gen_images.py has run; SVG otherwise.
+  const shot = `<img src="/img/cam-${m.id}.png" alt="" loading="lazy"
+    style="width:100%;height:100%;object-fit:cover"
+    onerror="this.outerHTML=CAM">`;
   return `<div class="prod ${cls}" id="p-${m.id}">
     ${tag||''}
-    <div class="shot">${CAM}</div>
+    <div class="shot">${shot}</div>
     <div class="pb">
       <div class="store">${esc(m.store)}</div>
       <div class="pname">${esc(m.name)}</div>
